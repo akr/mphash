@@ -25,8 +25,14 @@
 # OF SUCH DAMAGE.
 
 require 'mphash'
+require 'pp'
 
-keys = (1..100).map { rand.to_s }
+num = 100
+if ARGV[0]
+  num = ARGV[0].to_i
+end
+
+keys = (1..num).map { rand.to_s }
 #puts keys
 
 mphf = MPHash::MPHF.new(keys)
@@ -42,5 +48,5 @@ keys.each {|key|
 }
 #p check
 
-p mphf
+pp mphf
 
