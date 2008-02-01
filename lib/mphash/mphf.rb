@@ -125,11 +125,19 @@ class MPHash
     end
 
     RANK_BLOCKSIZE = 256
+    RANK_SMALLBLOCKSIZE = 16
     def ranking
       @ranking = []
+      @ranking_small = []
       k = 0
       @g.each_with_index {|j, i|
-        @ranking << k if i % RANK_BLOCKSIZE == 0
+        if i != 0
+          if i % RANK_BLOCKSIZE == 0
+            @ranking << k
+          elsif i % RANK_SMALLBLOCKSIZE == 0
+            @ranking_small << (k - @ranking.fetch(-1, 0))
+          end
+        end
         next if j == @r
         k += 1
       }
@@ -143,9 +151,17 @@ class MPHash
 
     def mphf(key)
       h = phf(key)
-      a = h / RANK_BLOCKSIZE
-      result = @ranking[a]
-      (a * RANK_BLOCKSIZE).upto(h-1) {|i|
+      a, b = h.divmod(RANK_BLOCKSIZE)
+      if a == 0
+        result = 0
+      else
+        result = @ranking[a-1]
+      end
+      b, c = b.divmod(RANK_SMALLBLOCKSIZE)
+      if b != 0
+        result += @ranking_small[a*(RANK_BLOCKSIZE/RANK_SMALLBLOCKSIZE-1)+b-1]
+      end
+      (h-c).upto(h-1) {|i|
         result += 1 if @g[i] != @r
       }
       result

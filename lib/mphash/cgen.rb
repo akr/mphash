@@ -40,11 +40,16 @@ class MPHash
       vs.reverse!
       packed_g << vs.inject(0) {|r, v| r * 4 + v }
     }
-    formatted_g = packed_g.map {|v| "0x%x, " % v }
-    formatted_g.last.sub!(/, /, '')
+    formatted_g = packed_g.map {|v| "0x%x," % v }
+    formatted_g.last.sub!(/,/, '')
     ranking = h.instance_variable_get(:@ranking)
-    formatted_ranking = ranking.map {|v| "0x%x, " % v }
-    formatted_ranking.last.sub!(/, /, '')
+    formatted_ranking = ranking.map {|v| "0x%x," % v }
+    formatted_ranking << "0" if formatted_ranking.empty?
+    formatted_ranking.last.sub!(/,/, '')
+    ranking_small = h.instance_variable_get(:@ranking_small)
+    formatted_ranking_small = ranking_small.map {|v| "0x%x," % v }
+    formatted_ranking_small << "0" if formatted_ranking_small.empty?
+    formatted_ranking_small.last.sub!(/,/, '')
 
     ERB.new(TEMPLATE_C, nil, '%').result(binding)
   end
@@ -59,30 +64,36 @@ static struct {
   uint32_t range;
   uint32_t salt0, salt1, salt2;
   uint32_t g[<%= (g.length + 15) / 16 %>];
-  uint32_t ranking[<%= ranking.length %>];
+  uint32_t ranking[<%= formatted_ranking.length %>];
+  unsigned char ranking_small[<%= formatted_ranking_small.length %>];
 } mphf_parameter = {
   <%= range %>,
   <%= salts[0] %>, <%= salts[1] %>, <%= salts[2] %>,
   {
-% formatted_g.each_slice(4) {|vs|
+% formatted_g.each_slice(6) {|vs|
     <%= vs.join('') %>
 % }
   },
   {
-% formatted_ranking.each_slice(4) {|vs|
+% formatted_ranking.each_slice(6) {|vs|
+    <%= vs.join('') %>
+% }
+  },
+  {
+% formatted_ranking_small.each_slice(15) {|vs|
     <%= vs.join('') %>
 % }
   }
 };
 
 #define RANK_BLOCKSIZE <%= MPHash::MPHF::RANK_BLOCKSIZE %>
+#define RANK_SMALLBLOCKSIZE <%= MPHash::MPHF::RANK_SMALLBLOCKSIZE %>
 
 #define GCC_VERSION_BEFORE(major, minor, patchlevel) \
   (defined(__GNUC__) && !defined(__INTEL_COMPILER) && \
    ((__GNUC__ < (major)) ||  \
     (__GNUC__ == (major) && __GNUC_MINOR__ < (minor)) || \
     (__GNUC__ == (major) && __GNUC_MINOR__ == (minor) && __GNUC_PATCHLEVEL__ < (patchlevel))))
-
 
 #if defined(__GNUC__) && !GCC_VERSION_BEFORE(3,4,0)
 # define popcount(w) __builtin_popcountl(w)
@@ -94,46 +105,35 @@ static struct {
 
 static unsigned long mphf(const void *key, size_t length)
 {
-    uint32_t fullhash0, fullhash1, fullhash2;
-    uint32_t h[3];
-    uint32_t ph, mph, a, *p, mask;
-    int i;
-    fullhash0 = mphf_parameter.salt0;
-    fullhash1 = mphf_parameter.salt1;
-    hashlittle2(key, length, &fullhash0, &fullhash1);
-    fullhash2 = hashlittle(key, length, mphf_parameter.salt2);
-    h[0] = fullhash0 % mphf_parameter.range;
-    h[1] = (fullhash1 % mphf_parameter.range) + mphf_parameter.range;
-    h[2] = (fullhash2 % mphf_parameter.range) + mphf_parameter.range*2;
-    i = ((mphf_parameter.g[h[0] / 16] >> (2 * (h[0] % 16))) & 0x3) +
-        ((mphf_parameter.g[h[1] / 16] >> (2 * (h[1] % 16))) & 0x3) +
-        ((mphf_parameter.g[h[2] / 16] >> (2 * (h[2] % 16))) & 0x3);
-    ph = h[i % 3];
-    a = ph / RANK_BLOCKSIZE;
-    mph = mphf_parameter.ranking[a];
-    p = &mphf_parameter.g[a * RANK_BLOCKSIZE / 16];
-    ph %= RANK_BLOCKSIZE;
-    mask = (ph%16) == 0 ? 0 : (1 << ((ph%16) * 2)) - 1;
-    mph += (ph%16) - GPOPCOUNT(p[ph / 16] & mask);
-    switch (ph / 16) {
-      case 15: mph += 16 - GPOPCOUNT(p[14]);
-      case 14: mph += 16 - GPOPCOUNT(p[13]);
-      case 13: mph += 16 - GPOPCOUNT(p[12]);
-      case 12: mph += 16 - GPOPCOUNT(p[11]);
-      case 11: mph += 16 - GPOPCOUNT(p[10]);
-      case 10: mph += 16 - GPOPCOUNT(p[9]);
-      case 9: mph += 16 - GPOPCOUNT(p[8]);
-      case 8: mph += 16 - GPOPCOUNT(p[7]);
-      case 7: mph += 16 - GPOPCOUNT(p[6]);
-      case 6: mph += 16 - GPOPCOUNT(p[5]);
-      case 5: mph += 16 - GPOPCOUNT(p[4]);
-      case 4: mph += 16 - GPOPCOUNT(p[3]);
-      case 3: mph += 16 - GPOPCOUNT(p[2]);
-      case 2: mph += 16 - GPOPCOUNT(p[1]);
-      case 1: mph += 16 - GPOPCOUNT(p[0]);
-      case 0: ;
-    }
-    return mph;
+  uint32_t fullhash0, fullhash1, fullhash2;
+  uint32_t h[3];
+  uint32_t ph, mph, a, b, c, u;
+  int i;
+  fullhash0 = mphf_parameter.salt0;
+  fullhash1 = mphf_parameter.salt1;
+  hashlittle2(key, length, &fullhash0, &fullhash1);
+  fullhash2 = hashlittle(key, length, mphf_parameter.salt2);
+  h[0] = fullhash0 % mphf_parameter.range;
+  h[1] = (fullhash1 % mphf_parameter.range) + mphf_parameter.range;
+  h[2] = (fullhash2 % mphf_parameter.range) + mphf_parameter.range*2;
+  i = ((mphf_parameter.g[h[0] / 16] >> (2 * (h[0] % 16))) & 0x3) +
+      ((mphf_parameter.g[h[1] / 16] >> (2 * (h[1] % 16))) & 0x3) +
+      ((mphf_parameter.g[h[2] / 16] >> (2 * (h[2] % 16))) & 0x3);
+  ph = h[i % 3];
+  a = ph / RANK_BLOCKSIZE;
+  b = ph % RANK_BLOCKSIZE;
+  c = b % RANK_SMALLBLOCKSIZE;
+  b = b / RANK_SMALLBLOCKSIZE;
+  mph = 0;
+  if (a != 0)
+    mph = mphf_parameter.ranking[a-1];
+  if (b != 0)
+    mph += mphf_parameter.ranking_small[a*(RANK_BLOCKSIZE/RANK_SMALLBLOCKSIZE-1)+b-1];
+  if (c != 0) {
+    u = mphf_parameter.g[ph / 16] & ((1 << (c*2)) - 1);
+    mph += c - GPOPCOUNT(u);
+  }
+  return mph;
 }
 
 #if 0
@@ -141,12 +141,8 @@ int main(int argc, char **argv)
 {
   uint32_t h1;
 % keys.each {|k| 
-  h1 = phf(<%=k.dump%>, <%=k.length%>);
-  if (h1 != <%=h.phf(k).to_s%>)
-    printf("bug:phf: %s : expected:%u but:%u\n", <%=k.dump%>, <%=h.mphf(k).to_s%>, h1);
-  h1 = mphf(<%=k.dump%>, <%=k.length%>);
-  if (h1 != <%=h.mphf(k).to_s%>)
-    printf("bug:mphf: %s : expected:%u but:%u\n", <%=k.dump%>, <%=h.mphf(k).to_s%>, h1);
+  //h1 = phf(<%=k.dump%>, <%=k.length%>); if (h1 != <%=h.phf(k).to_s%>) printf("bug:phf: %s : expected:%u but:%u\n", <%=k.dump%>, <%=h.mphf(k).to_s%>, h1);
+  h1 = mphf(<%=k.dump%>, <%=k.length%>); if (h1 != <%=h.mphf(k).to_s%>) printf("bug:mphf: %s : expected:%u but:%u\n", <%=k.dump%>, <%=h.mphf(k).to_s%>, h1);
 % }
   return 0;
 }
