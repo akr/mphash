@@ -101,8 +101,6 @@ static struct {
 # error "popcount not implemented"
 #endif
 
-#define GPOPCOUNT(w) popcount(((w) & 0x55555555) & ((w) >> 1))
-
 static unsigned long mphf(const void *key, size_t length)
 {
   uint32_t fullhash0, fullhash1, fullhash2;
@@ -130,7 +128,6 @@ static unsigned long mphf(const void *key, size_t length)
   if (b != 0)
     mph += mphf_parameter.ranking_small[a*(RANK_BLOCKSIZE/RANK_SMALLBLOCKSIZE-1)+b-1];
   if (c != 0) {
-    uint32_t mask0, mask1;
     i = ph / RANK_SMALLBLOCKSIZE;
     u0 = mphf_parameter.g[i*2];
     u1 = 0;
