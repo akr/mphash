@@ -80,7 +80,7 @@ static struct {
 % }
   },
   {
-% formatted_ranking_small.each_slice(15) {|vs|
+% formatted_ranking_small.each_slice(7) {|vs|
     <%= vs.join('') %>
 % }
   }
@@ -107,7 +107,7 @@ static unsigned long mphf(const void *key, size_t length)
 {
   uint32_t fullhash0, fullhash1, fullhash2;
   uint32_t h[3];
-  uint32_t ph, mph, a, b, c, u;
+  uint32_t ph, mph, a, b, c, u0, u1;
   int i;
   fullhash0 = mphf_parameter.salt0;
   fullhash1 = mphf_parameter.salt1;
@@ -130,13 +130,24 @@ static unsigned long mphf(const void *key, size_t length)
   if (b != 0)
     mph += mphf_parameter.ranking_small[a*(RANK_BLOCKSIZE/RANK_SMALLBLOCKSIZE-1)+b-1];
   if (c != 0) {
-    u = mphf_parameter.g[ph / 16] & ((1 << (c*2)) - 1);
-    mph += c - GPOPCOUNT(u);
+    uint32_t mask0, mask1;
+    i = ph / RANK_SMALLBLOCKSIZE;
+    u0 = mphf_parameter.g[i*2];
+    u1 = 0;
+    if (c < 16)
+      u0 &= (1 << (c*2)) - 1;
+    else if (c != 16) {
+      u1 = mphf_parameter.g[i*2+1];
+      u1 &= (1 << ((c-16)*2)) - 1;
+    }
+    u0 = (u0 & 0x55555555) & (u0 >> 1);
+    u1 = (u1 & 0xaaaaaaaa) & (u1 << 1);
+    mph += c - popcount(u0|u1);
   }
   return mph;
 }
 
-#if 0
+#if 1
 int main(int argc, char **argv)
 {
   uint32_t h1;

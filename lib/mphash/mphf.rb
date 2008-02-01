@@ -125,7 +125,7 @@ class MPHash
     end
 
     RANK_BLOCKSIZE = 256
-    RANK_SMALLBLOCKSIZE = 16
+    RANK_SMALLBLOCKSIZE = 32
     def ranking
       @ranking = []
       @ranking_small = []
