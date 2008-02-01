@@ -96,11 +96,15 @@ void
 Init_mphash()
 {
   VALUE cMPHash;
+  VALUE tmp;
 
   cMPHash = rb_define_class("MPHash", rb_cObject);
   rb_define_singleton_method(cMPHash, "jenkins_lookup3", jenkins_lookup3, -1);
   rb_define_singleton_method(cMPHash, "jenkins_lookup3_2", jenkins_lookup3_2, -1);
-  rb_define_const(cMPHash, "JENKINS_LOOKUP3", rb_str_new(hash_lookup3, sizeof(hash_lookup3)-1));
+
+  tmp = rb_str_new(hash_lookup3, sizeof(hash_lookup3)-1);
+  rb_obj_freeze(tmp);
+  rb_define_const(cMPHash, "JENKINS_LOOKUP3", tmp);
 }
 
 
