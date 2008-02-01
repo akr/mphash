@@ -13,6 +13,7 @@ http://www.a-k-r.org/mphash/
 == Feature
 
 * generate a minimal perfect hash function
+* generate a C source code (the generated source code is public domain)
 
 == Requirements
 
