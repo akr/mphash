@@ -1,4 +1,4 @@
-# mphash.rb - minimal perfect hash library
+# mphash/cgen.rb - C code generator for minimal perfect hash
 #
 # Copyright (C) 2008 Tanaka Akira  <akr@fsij.org>
 # 
