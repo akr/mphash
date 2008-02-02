@@ -1,0 +1,517 @@
+#!/usr/bin/env ruby
+
+class String
+  alias bytesize size unless "".respond_to? :bytesize
+end
+
+require 'mphash'
+require 'optparse'
+require 'erb'
+
+SECTIONS = {}
+section_name = nil
+DATA.each_line {|line|
+  if %r{^\/\* section: (.*) \*\/\n} =~ line
+    section_name = $1
+    SECTIONS[section_name] = ''
+  elsif section_name == nil
+    next
+  else
+    if !SECTIONS[section_name].empty? || /\A\s*\z/ !~ line
+      SECTIONS[section_name] << line
+    end
+  end
+}
+
+C_UNESCAPE = {}
+C_UNESCAPE['t'] = "\t"
+C_UNESCAPE['n'] = "\n"
+C_UNESCAPE['r'] = "\r"
+C_UNESCAPE['f'] = "\f"
+C_UNESCAPE['b'] = "\b"
+C_UNESCAPE['a'] = "\a"
+C_UNESCAPE['v'] = "\v"
+C_UNESCAPE['e'] = "\e"
+0.upto(0xff) {|c|
+  s = [c].pack("C")
+  oct = "%03o" % c
+  C_UNESCAPE[oct] = s
+  C_UNESCAPE[oct[1,2]] = s if /\A0/ =~ oct
+  C_UNESCAPE[oct[2,1]] = s if /\A00/ =~ oct
+  hex = "x%02x" % c
+  C_UNESCAPE[hex] = s
+}
+
+def parse_keyfile(io)
+  lines = io.readlines
+  result = []
+  lines.each_with_index {|line, lineno|
+    line.chomp!
+    lineno += 1
+    if /\A"/ =~ line
+      if /\A"((?:[^\\]|\\(?:[tnrfbaes]|\\[0-3][0-7][0-7]|\\[0-7][0-7]?|\\x[0-9a-fA-F][0-9a-fA-F]))*)"\s*\z/ !~ line
+        raise "#{lineno}: invalid quoted string: #{line.inspect}"
+      end
+      key = $1.gsub(/[^\\]|\\(?:([tnrfbaes])|\\([0-3][0-7][0-7])|\\([0-7][0-7]?)|\\(x[0-9a-fA-F][0-9a-fA-F]))/) {
+        $+ ? C_UNESCAPE[$+] : $&
+      }
+    elsif /\A(\w+)\s*\z/ =~ line
+      key = $1
+    else
+      raise "#{lineno}: unexpected line: #{line.inspect}"
+    end
+    result << key
+  }
+  result
+end
+
+def gen_output(code)
+  if !$opt_o
+    print code
+    return
+  end
+  n = 1
+  begin
+    tmpname = "#{$opt_o}.tmp#{n}"
+    f = File.open(tmpname, File::WRONLY|File::CREAT|File::EXCL)
+  rescue Errno::EEXIST
+    n += 1
+    retry
+  end
+  begin
+    f << code
+  ensure
+    f.close
+  end
+  File.rename(tmpname, $opt_o)
+end
+
+def gen_func_data(mphf, linkage, name, paramter=nil)
+  range = mphf.instance_variable_get(:@range)
+  hashtuple = mphf.instance_variable_get(:@hashtuple)
+  salts = hashtuple.instance_variable_get(:@salt)
+  g = mphf.instance_variable_get(:@g)
+  packed_g = []
+  g.each_slice(16) {|vs|
+    vs << 0 while vs.length < 16
+    vs.reverse!
+    packed_g << vs.inject(0) {|r, v| r * 4 + v }
+  }
+  formatted_g = packed_g.map {|v| "0x%x," % v }
+  formatted_g.last.sub!(/,/, '')
+  ranking = mphf.instance_variable_get(:@ranking)
+  formatted_ranking = ranking.map {|v| "0x%x," % v }
+  formatted_ranking << "0" if formatted_ranking.empty?
+  formatted_ranking.last.sub!(/,/, '')
+  ranking_small = mphf.instance_variable_get(:@ranking_small)
+  formatted_ranking_small = ranking_small.map {|v| "0x%x," % v }
+  formatted_ranking_small << "0" if formatted_ranking_small.empty?
+  formatted_ranking_small.last.sub!(/,/, '')
+
+  template = SECTIONS['hash parameter definition']
+  ERB.new(template, nil, '%').result(binding)
+end
+
+def expand_funcdata_template(linkage, name, template_name, mphf)
+  range = mphf.instance_variable_get(:@range)
+  hashtuple = mphf.instance_variable_get(:@hashtuple)
+  salts = hashtuple.instance_variable_get(:@salt)
+  g = mphf.instance_variable_get(:@g)
+  packed_g = []
+  g.each_slice(16) {|vs|
+    vs << 0 while vs.length < 16
+    vs.reverse!
+    packed_g << vs.inject(0) {|r, v| r * 4 + v }
+  }
+  formatted_g = packed_g.map {|v| "0x%x," % v }
+  formatted_g.last.sub!(/,/, '')
+  ranking = mphf.instance_variable_get(:@ranking)
+  formatted_ranking = ranking.map {|v| "0x%x," % v }
+  formatted_ranking << "0" if formatted_ranking.empty?
+  formatted_ranking.last.sub!(/,/, '')
+  ranking_small = mphf.instance_variable_get(:@ranking_small)
+  formatted_ranking_small = ranking_small.map {|v| "0x%x," % v }
+  formatted_ranking_small << "0" if formatted_ranking_small.empty?
+  formatted_ranking_small.last.sub!(/,/, '')
+
+  ERB.new(SECTIONS[template_name], nil, '%').result(binding)
+end
+
+C_ESC = {
+  "\\" => "\\\\",
+  '"' => '\"',
+  "\n" => '\n',
+}
+0x00.upto(0x1f) {|ch| C_ESC[[ch].pack("C")] ||= "\\%03o" % ch }
+0x7f.upto(0xff) {|ch| C_ESC[[ch].pack("C")] = "\\%03o" % ch }
+C_ESC_PAT = Regexp.union(*C_ESC.keys)
+def c_esc(str)
+  '"' + str.gsub(C_ESC_PAT) { C_ESC[$&] } + '"'
+end
+
+def expand_template(linkage, name, template_name, hash={})
+  code = ''
+  hash.each {|k, v|
+    code << "#{k} = hash[#{k.inspect}]\n"
+  }
+  code << 'ERB.new(SECTIONS[template_name], nil, "%").result(binding)'
+  eval code
+end
+
+$opt_f = false
+$opt_t = false
+
+$opt_c = false
+$opt_d = false
+$opt_H = false
+
+$opt_o = nil
+$opt_n = nil
+
+
+op = OptionParser.new
+op.def_option('-h', '--help') { puts op; exit 0 }
+op.def_option('-f', '--function') { $opt_f = true }
+op.def_option('-t', '--table') { $opt_t = true }
+op.def_option('-d', '--data') { $opt_d = true }
+op.def_option('-c', '--code') { $opt_c = true }
+op.def_option('-H', '--header') { $opt_H = true }
+op.def_option('-o OUTPUT', '--output OUTPUT') {|arg| $opt_o = arg }
+op.def_option('-n NAME', '--name NAME') {|arg| $opt_n = arg }
+op.parse!
+
+def error(message)
+  STDERR.puts message
+  exit 1
+end
+
+if $opt_f && $opt_t
+  error "exclusive options given: -f and -t"
+end
+
+if $opt_f || $opt_t || true
+  code = "/* This file is public domain. */\n\n"
+  if $opt_f
+    if !$opt_c
+      if $opt_d
+        name = $opt_n || 'mphf_param'
+      else
+        name = $opt_n || 'mphf'
+      end
+    end
+    if $opt_c
+      if $opt_H
+        if $opt_o && File.basename($opt_o) != 'mphash.h'
+          warn "common header name is not 'mphash.h'"
+        end
+        code << "\#ifndef MPHASH_H\n"
+        code << "\#define MPHASH_H\n\n"
+        code << SECTIONS.fetch("common header")
+        code << SECTIONS.fetch('generic hash function declaration')
+        code << "\#endif\n"
+      else
+        code << "\#include \"mphash.h\"\n\n"
+        code << MPHash::JENKINS_LOOKUP3
+        code << expand_template("", nil, 'generic hash function definition')
+      end
+    else
+      if $opt_H
+        if $opt_d
+          code << "\#include \"mphash.h\"\n\n"
+          code << expand_template("", name, 'hash parameter declaration')
+        else
+          code << expand_template("", name, 'specific hash function declaration')
+        end
+      else
+        keys = parse_keyfile(ARGF)
+        mphf = MPHash::MPHF.new(keys)
+        if $opt_d
+          code << expand_funcdata_template("", name, 'hash parameter definition', mphf)
+        else
+          code << SECTIONS.fetch("common header")
+          code << expand_funcdata_template("static", "mphf_param", 'hash parameter definition', mphf)
+          code << MPHash::JENKINS_LOOKUP3
+          code << expand_template("static", "mphash_generic", 'generic hash function definition')
+          code << expand_template("", name, 'specific hash function definition', :param_name => "mphf_param")
+        end
+      end
+    end
+  else
+    keys = parse_keyfile(ARGF)
+    mphf = MPHash::MPHF.new(keys)
+    code << SECTIONS.fetch("common header")
+    code << expand_funcdata_template("static", "mphf_param", 'hash parameter definition', mphf)
+    code << MPHash::JENKINS_LOOKUP3
+    code << expand_template("static", "mphash_generic", 'generic hash function definition')
+    code << expand_template("", 'mphf', 'specific hash function definition', :param_name => "mphf_param")
+    code << expand_template("", nil, 'test command main', :keys => keys)
+  end
+  gen_output(code)
+end
+
+__END__
+
+/* section: common header */
+
+#include <stdint.h>     /* for uint32_t */
+#include <stddef.h>     /* for size_t */
+
+typedef struct {
+  uint32_t range;
+  uint32_t salt0, salt1, salt2;
+  const uint32_t *g;
+  const uint32_t *ranking;
+  const unsigned char *ranking_small;
+} mphash_func_t;
+
+/* section: hash parameter declaration */
+
+<%=linkage%>
+const mphash_func_t *<%=name%>;
+
+/* section: hash parameter definition */
+
+static const uint32_t <%=name%>_g[] = {
+% formatted_g.each_slice(6) {|vs|
+    <%= vs.join('') %>
+% }
+};
+
+static const uint32_t <%=name%>_ranking[] = {
+% formatted_ranking.each_slice(6) {|vs|
+    <%= vs.join('') %>
+% }
+};
+
+static const unsigned char <%=name%>_ranking_small[] = {
+% formatted_ranking_small.each_slice(7) {|vs|
+    <%= vs.join('') %>
+% }
+};
+
+static const mphash_func_t <%=name%>_struct = {
+  <%= range %>,
+  <%= salts[0] %>, <%= salts[1] %>, <%= salts[2] %>,
+  <%=name%>_g,
+  <%=name%>_ranking,
+  <%=name%>_ranking_small
+};
+
+<%=linkage%>
+const mphash_func_t *<%=name%> = &<%=name%>_struct;
+
+/* section: generic hash function declaration */
+
+extern uint32_t mphash_generic(const void *key, size_t length, const mphash_func_t *param);
+
+/* section: generic hash function definition */
+
+/*---------------------------------------------------------------------*/
+/* minimal perfect hash function, by Tanaka Akira 2008, Public Domain. */
+
+#define RANK_BLOCKSIZE <%=MPHash::MPHF::RANK_BLOCKSIZE%>
+#define RANK_SMALLBLOCKSIZE <%=MPHash::MPHF::RANK_SMALLBLOCKSIZE%>
+
+#define GCC_VERSION_BEFORE(major, minor, patchlevel) \
+  (defined(__GNUC__) && !defined(__INTEL_COMPILER) && \
+   ((__GNUC__ < (major)) ||  \
+    (__GNUC__ == (major) && __GNUC_MINOR__ < (minor)) || \
+    (__GNUC__ == (major) && __GNUC_MINOR__ == (minor) && __GNUC_PATCHLEVEL__ < (patchlevel))))
+
+#if defined(__GNUC__) && !GCC_VERSION_BEFORE(3,4,0)
+# define popcount(w) __builtin_popcountl(w)
+#else
+# error "popcount not implemented"
+#endif
+
+<%=linkage%>
+uint32_t mphash_generic(const void *key, size_t length, const mphash_func_t *param)
+{
+  uint32_t fullhash0, fullhash1, fullhash2;
+  uint32_t h[3];
+  uint32_t ph, mph, a, b, c, u0, u1;
+  int i;
+  fullhash0 = param->salt0;
+  fullhash1 = param->salt1;
+  hashlittle2(key, length, &fullhash0, &fullhash1);
+  fullhash2 = hashlittle(key, length, param->salt2);
+  h[0] = fullhash0 % param->range;
+  h[1] = (fullhash1 % param->range) + param->range;
+  h[2] = (fullhash2 % param->range) + param->range*2;
+  i = ((param->g[h[0] / 16] >> (2 * (h[0] % 16))) & 0x3) +
+      ((param->g[h[1] / 16] >> (2 * (h[1] % 16))) & 0x3) +
+      ((param->g[h[2] / 16] >> (2 * (h[2] % 16))) & 0x3);
+  ph = h[i % 3];
+  a = ph / RANK_BLOCKSIZE;
+  b = ph % RANK_BLOCKSIZE;
+  c = b % RANK_SMALLBLOCKSIZE;
+  b = b / RANK_SMALLBLOCKSIZE;
+  mph = 0;
+  if (a != 0)
+    mph = param->ranking[a-1];
+  if (b != 0)
+    mph += param->ranking_small[a*(RANK_BLOCKSIZE/RANK_SMALLBLOCKSIZE-1)+b-1];
+  if (c != 0) {
+    i = ph / RANK_SMALLBLOCKSIZE;
+    u0 = param->g[i*2];
+    u1 = 0;
+    if (c < 16)
+      u0 &= (1 << (c*2)) - 1;
+    else if (c != 16) {
+      u1 = param->g[i*2+1];
+      u1 &= (1 << ((c-16)*2)) - 1;
+    }
+    u0 = (u0 & 0x55555555) & (u0 >> 1);
+    u1 = (u1 & 0xaaaaaaaa) & (u1 << 1);
+    mph += c - popcount(u0|u1);
+  }
+  return mph;
+}
+/*---------------------------------------------------------------------*/
+
+/* section: specific hash function declaration */
+
+<%=linkage%>
+uint32_t <%=name%>(const void *key, size_t length);
+
+/* section: specific hash function definition */
+
+<%=linkage%>
+uint32_t <%=name%>(const void *key, size_t length)
+{
+  return mphash_generic(key, length, <%=param_name%>);
+}
+
+/* section: test command main */
+
+typedef struct {
+  size_t len;
+  char *key;
+} mphash_key_t;
+
+mphash_key_t keys[] = {
+% keys.each {|key|
+  { <%=key.bytesize%>, <%=c_esc(key)%> },
+% }
+};
+
+#define NUMKEYS <%=keys.length%>
+
+#include <stdlib.h>     /* for exit */
+#include <unistd.h>     /* for getopt */
+#include <string.h>     /* for strlen */
+
+void usage(int status)
+{
+  fputs(
+"usage: mphash-test-commnad [options]\n"
+"option: -h : print this message\n"
+"        -l : list keys and hash values (default action)\n"
+"        -v : generated hash validation\n"
+"        -q arg1 arg2 ... : query hash value\n"
+        , stdout);
+  exit(status);
+}
+
+void showstr(FILE *fp, char *str, size_t len)
+{
+  size_t i;
+  fputc('"', fp);
+  for (i = 0; i < len; i++) {
+    int c = (unsigned char)str[i];
+    switch (c) {
+      case '"': fputs("\\\"", fp); continue;
+      case '\\': fputs("\\\\", fp); continue;
+      case '\t': fputs("\\t", fp); continue;
+      case '\n': fputs("\\n", fp); continue;
+      case '\r': fputs("\\r", fp); continue;
+      case '\f': fputs("\\f", fp); continue;
+      case '\b': fputs("\\b", fp); continue;
+      case '\a': fputs("\\a", fp); continue;
+      case '\v': fputs("\\v", fp); continue;
+      case '\x1b': fputs("\\e", fp); continue;
+    }
+    if (c < 0x20 || 0x7e < c) {
+      fprintf(fp, "\\%03o", c);
+    }
+    else {
+      fputc(c, fp);
+    }
+  }
+  fputc('"', fp);
+}
+
+void list(void)
+{
+  unsigned long l;
+  for (l = 0; l < NUMKEYS; l++) {
+    printf("%u ", mphf(keys[l].key, keys[l].len));
+    showstr(stdout, keys[l].key, keys[l].len);
+    putchar('\n');
+  }
+}
+
+void validation(void)
+{
+  static mphash_key_t *list[NUMKEYS];
+  int fail = 0;
+  unsigned long l;
+  for (l = 0; l < NUMKEYS; l++) {
+    uint32_t h = mphf(keys[l].key, keys[l].len);
+    if (NUMKEYS <= h) {
+      fail = 1;
+      printf("invalid hash value: %u ", h);
+      showstr(stdout, keys[l].key, keys[l].len);
+      putchar('\n');
+      continue;
+    }
+    if (list[h]) {
+      fail = 1;
+      printf("collision found: %u ", h);
+      showstr(stdout, list[h]->key, list[h]->len);
+      putchar(' ');
+      showstr(stdout, keys[l].key, keys[l].len);
+      putchar('\n');
+    }
+    list[h] = &keys[l];
+  }
+  if (!fail) {
+    puts("ok");
+  }
+}
+
+void query(int argc, char **argv)
+{
+  int i;
+  for (i = 0; i < argc; i++) {
+    size_t len = strlen(argv[i]);
+    printf("%u\n", mphf(argv[i], len));
+  }
+}
+
+int main(int argc, char **argv)
+{
+  int c;
+
+  while ((c = getopt(argc, argv, "hlvq")) != -1) {
+    switch(c) {
+      case 'h':
+        usage(0);
+
+      case ':':
+        fprintf(stderr, "option argument expected for -%c\n", optopt);
+        exit(1);
+
+      case '?':
+        fprintf(stderr, "unexpected option -%c\n", optopt);
+        exit(1);
+
+      case 'l': list(); exit(0);
+      case 'v': validation(); exit(0);
+      case 'q': query(argc-optind, argv+optind); exit(0);
+    }
+  }
+
+  list();
+  return 0;
+}

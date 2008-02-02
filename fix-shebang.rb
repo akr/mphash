@@ -1,4 +1,6 @@
-# depend - additional makefile 
+#!/usr/bin/ruby
+
+# fix-shebang.rb - fix shebang line
 #
 # Copyright (C) 2008 Tanaka Akira  <akr@fsij.org>
 # 
@@ -24,23 +26,36 @@
 # IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
 # OF SUCH DAMAGE.
 
-mphash.o: mphash.c hash/lookup3.c code/code_lookup3.c
-	$(CC) $(INCFLAGS) $(CPPFLAGS) $(CFLAGS) -c $<
+# usage: ruby fix-shebang.rb [-o destination] [source]
 
-code/code_lookup3.c: hash/lookup3.c txt2c.rb
-	test -d code || mkdir code
-	$(RUBY) txt2c.rb -o $@ $<
+require 'optparse'
+require 'rbconfig'
 
-rdoc: mphash.c
-	rm -rf rdoc
-	rdoc --op rdoc mphash.c
+$opt_dest = nil
+op = OptionParser.new
+op.def_option('-h') { puts op; exit 0 }
+op.def_option('-o destination') {|destination| $opt_dest = destination }
+op.parse!
 
-all: bin/mphash
+rubybin = [RbConfig::CONFIG["bindir"], RbConfig::CONFIG["ruby_install_name"]].join('/')
+script = ARGF.read
+script.sub!(%r{\A\#!/usr/bin/env ruby}) { "\#!#{rubybin}" }
 
-bin/mphash: bin/mphash.in
-	$(RUBY) fix-shebang.rb -o $@ $<
-
-install: install-bin
-
-install-bin: bin/mphash
-	$(INSTALL_PROG) $< $(bindir)
+if $opt_dest
+  n = 1
+  begin
+    tmpname = "#{$opt_dest}.tmp#{n}"
+    f = File.open(tmpname, File::WRONLY|File::CREAT|File::EXCL)
+  rescue Errno::EEXIST
+    n += 1
+    retry
+  end
+  begin
+    f << script
+  ensure
+    f.close
+  end
+  File.rename(tmpname, $opt_dest)
+else
+  puts script
+end
