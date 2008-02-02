@@ -44,3 +44,8 @@ install: install-bin
 
 install-bin: bin/mphash
 	$(INSTALL_PROG) $< $(bindir)
+
+clean: clean-bin
+
+clean-bin:
+	@-$(RM) bin/mphash
