@@ -278,7 +278,9 @@ const mphash_func_t *<%=name%> = &<%=name%>_struct;
 
 /* section: generic hash function declaration */
 
-extern uint32_t mphash_generic(const void *key, size_t length, const mphash_func_t *param);
+extern uint32_t mphash_generic(
+   const void *key, size_t length, const mphash_func_t *param,
+   uint32_t *hash0_ret, uint32_t *hash1_ret, uint32_t *hash2_ret);
 
 /* section: generic hash function definition */
 
@@ -309,7 +311,9 @@ int popcount(uint32_t x) /* from Hacker's Delight by Henry S. Warren, Jr. */
 #endif
 
 <%=linkage%>
-uint32_t mphash_generic(const void *key, size_t length, const mphash_func_t *param)
+uint32_t mphash_generic(
+  const void *key, size_t length, const mphash_func_t *param,
+  uint32_t *hash0_ret, uint32_t *hash1_ret, uint32_t *hash2_ret)
 {
   uint32_t fullhash0, fullhash1, fullhash2;
   uint32_t h[3];
@@ -319,6 +323,9 @@ uint32_t mphash_generic(const void *key, size_t length, const mphash_func_t *par
   fullhash1 = param->salt1;
   hashlittle2(key, length, &fullhash0, &fullhash1);
   fullhash2 = hashlittle(key, length, param->salt2);
+  if (hash0_ret) *hash0_ret = fullhash0;
+  if (hash1_ret) *hash1_ret = fullhash1;
+  if (hash2_ret) *hash2_ret = fullhash2;
   h[0] = fullhash0 % param->range;
   h[1] = (fullhash1 % param->range) + param->range;
   h[2] = (fullhash2 % param->range) + param->range*2;
@@ -369,7 +376,7 @@ uint32_t <%=name%>(const void *key, size_t length);
 <%=linkage%>
 uint32_t <%=name%>(const void *key, size_t length)
 {
-  return mphash_generic(key, length, <%=param_name%>);
+  return mphash_generic(key, length, <%=param_name%>, NULL, NULL, NULL);
 }
 
 /* section: test command main */

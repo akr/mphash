@@ -110,18 +110,22 @@ The 98568 words in the file are mapped to integers 0 to 98567.
   # single hash function
   #
   # uint32_t mphf(const void *key, size_t length) is defined.
-  # The default function name is mphf.  It is overrided by -n option.
+  # The default function name is mphf.  It is overridden by -n option.
   #
   mphash -fH [-n funcname] -o hash.h            # header
   mphash -f [-n funcname] -o hash.h keyfile     # funcname definition
 
   # multiple hash functions (default data name is mphf_param)
   #
-  # uint32_t mphash_generic(const void *key, size_t length, const mphash_func_t *param)
+  # uint32_t mphash_generic(
+  #   const void *key, size_t length, const mphash_func_t *param,
+  #   uint32_t *hash0_ret, uint32_t *hash1_ret, uint32_t *hash2_ret)
   # is defined by mphash.c.
   # const mphash_func_t *mphf_param is defined for each key.
   # The default parameter name is mphf_param. -n option override it.
-  # mphash_generic(key, length, mphf_param) returns a hash value.
+  # mphash_generic(key, length, mphf_param, NULL, NULL, NULL) returns a hash value.
+  # If non-NULL value is specified for hash0_ret, hash1_ret, hash2_ret,
+  # internally calculated three 32bit hash value is stored.
   #
   mphash -fcH -o mphash.h                       # common header
   mphash -fc -o mphash.c                        # code for hash functions
