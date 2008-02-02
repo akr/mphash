@@ -26,5 +26,3 @@
 
 require 'mphash.so'
 require 'mphash/mphf'
-require 'mphash/cgen'
-
