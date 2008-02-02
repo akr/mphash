@@ -488,12 +488,7 @@ int main(int argc, char **argv)
       case 'h':
         usage(0);
 
-      case ':':
-        fprintf(stderr, "option argument expected for -%c\n", optopt);
-        exit(1);
-
       case '?':
-        fprintf(stderr, "unexpected option -%c\n", optopt);
         exit(1);
 
       case 'l': list(); exit(0);
