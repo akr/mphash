@@ -2,6 +2,9 @@
 
 class String
   alias bytesize size unless "".respond_to? :bytesize
+  unless "".respond_to? :ord
+    def ord() self[0] end
+  end
 end
 
 require 'mphash'
@@ -24,47 +27,91 @@ DATA.each_line {|line|
   end
 }
 
-C_UNESCAPE = {}
-C_UNESCAPE['t'] = "\t"
-C_UNESCAPE['n'] = "\n"
-C_UNESCAPE['r'] = "\r"
-C_UNESCAPE['f'] = "\f"
-C_UNESCAPE['b'] = "\b"
-C_UNESCAPE['a'] = "\a"
-C_UNESCAPE['v'] = "\v"
-C_UNESCAPE['e'] = "\e"
+C_MNEMONIC_ESCAPE = {
+  't' => "\t",
+  'n' => "\n",
+  'r' => "\r",
+  'f' => "\f",
+  'b' => "\b",
+  'a' => "\a",
+  'v' => "\v"
+}
+
+SRC_UNESCAPE = {}
+SRC_UNESCAPE.update C_MNEMONIC_ESCAPE
+SRC_UNESCAPE['e'] = "\e"
+
 0.upto(0xff) {|c|
   s = [c].pack("C")
   oct = "%03o" % c
-  C_UNESCAPE[oct] = s
-  C_UNESCAPE[oct[1,2]] = s if /\A0/ =~ oct
-  C_UNESCAPE[oct[2,1]] = s if /\A00/ =~ oct
+  SRC_UNESCAPE[oct] = s
+  SRC_UNESCAPE[oct[1,2]] = s if /\A0/ =~ oct
+  SRC_UNESCAPE[oct[2,1]] = s if /\A00/ =~ oct
   hex = "x%02x" % c
-  C_UNESCAPE[hex] = s
+  SRC_UNESCAPE[hex] = s
 }
+SRC_UNESCAPE['"'] = '"'
+SRC_UNESCAPE['\\'] = '\\'
 
-def parse_keyfile(io)
-  lines = io.readlines
+QUOTED_STRING_PAT = /"((?:[^\\"]|\\#{Regexp.union *SRC_UNESCAPE.keys})*)"/o
+def str_undump(str)
+  if /\A#{QUOTED_STRING_PAT}\z/o !~ str
+    raise "invalid quoting: #{str.inspect}"
+  end
+  key = $1.gsub(/[^\\"]|\\(#{Regexp.union *SRC_UNESCAPE.keys})/o) {
+    $1 ? SRC_UNESCAPE[$1] : $&
+  }
+end
+
+def parse_anyfile(io, fieldnum=nil)
   result = []
-  lines.each_with_index {|line, lineno|
-    next if /\A\s*\z/ =~ line
-    line.chomp!
+  lineno = 0
+  io.each_line {|line|
     lineno += 1
-    if /\A"/ =~ line
-      if /\A"((?:[^\\]|\\(?:[tnrfbaes]|\\[0-3][0-7][0-7]|\\[0-7][0-7]?|\\x[0-9a-fA-F][0-9a-fA-F]))*)"\s*\z/ !~ line
-        raise "#{lineno}: invalid quoted string: #{line.inspect}"
+    next if /\A\s*\z/ =~ line
+    str = line.dup
+    fields = []
+    loop {
+      str.sub!(/\A\s*/, '')
+      if str.empty?
+        break
+      elsif /\A"/ =~ str
+        if /\A#{QUOTED_STRING_PAT}/ !~ str
+          error "#{lineno}: unexpected line format: #{line.inspect}"
+        end
+        str = $'
+        fields << str_undump($&)
+      else
+        /\A\S+/ =~ str
+        fields << $&
+        str = $'
       end
-      key = $1.gsub(/[^\\]|\\(?:([tnrfbaes])|\\([0-3][0-7][0-7])|\\([0-7][0-7]?)|\\(x[0-9a-fA-F][0-9a-fA-F]))/) {
-        $+ ? C_UNESCAPE[$+] : $&
-      }
-    elsif /\A(\S+)\s*\z/ =~ line
-      key = $1
-    else
-      raise "#{lineno}: unexpected line: #{line.inspect}"
+    }
+    if fieldnum && fieldnum != fields.length
+      if fieldnum < fields.length
+        error "#{lineno}: fields lacks: #{line.inspect}"
+      else
+        error "#{lineno}: extra fields: #{line.inspect}"
+      end
     end
-    result << key
+    fields.map! {|str|
+      if /\A"/ =~ str
+        str_undump(str)
+      else
+        str
+      end
+    }
+    result << fields
   }
   result
+end
+
+def parse_keyfile(io)
+  parse_anyfile(io, 1).map {|fields| fields.first }
+end
+
+def parse_dictfile(io)
+  parse_anyfile(io, 2)
 end
 
 def gen_output(code)
@@ -113,6 +160,22 @@ def expand_funcdata_template(linkage, name, template_name, mphf)
   ERB.new(SECTIONS[template_name], nil, '%').result(binding)
 end
 
+def expand_tabledata_template(linkage, name, template_name, hash_param_name, mphf, dict)
+  offsets = []
+  off = 0
+  dict.each {|k, v|
+    offsets << off
+    off += k.bytesize
+    off += v.bytesize
+  }
+  entries = []
+  dict.each_with_index {|(k, v), src_index|
+    hash_index, full_hs = mphf.mphf_with_hashes(k)
+    entries[hash_index] = [full_hs[0], offsets[src_index], k.bytesize, v.bytesize]
+  }
+  ERB.new(SECTIONS[template_name], nil, '%').result(binding)
+end
+
 def expand_template(linkage, name, template_name, hash={})
   code = ''
   hash.each {|k, v|
@@ -125,13 +188,30 @@ end
 C_ESC = {
   "\\" => "\\\\",
   '"' => '\"',
-  "\n" => '\n',
+}
+C_MNEMONIC_ESCAPE.each {|mnemonic, ch| 
+  C_ESC[ch] = "\\#{mnemonic}"
 }
 0x00.upto(0x1f) {|ch| C_ESC[[ch].pack("C")] ||= "\\%03o" % ch }
 0x7f.upto(0xff) {|ch| C_ESC[[ch].pack("C")] = "\\%03o" % ch }
 C_ESC_PAT = Regexp.union(*C_ESC.keys)
 def c_esc(str)
   '"' + str.gsub(C_ESC_PAT) { C_ESC[$&] } + '"'
+end
+
+C_CHAR_ESC = {
+  "0".ord => "'\\0'",
+  "\\".ord => "'\\\\'",
+  '\''.ord => "'\\\''",
+}
+C_MNEMONIC_ESCAPE.each {|mnemonic, ch| 
+  C_CHAR_ESC[ch.ord] = "'\\#{mnemonic}'"
+}
+0x00.upto(0x1f) {|ch| C_CHAR_ESC[ch] ||= "'\\%03o'" % ch }
+0x20.upto(0x7f) {|ch| C_CHAR_ESC[ch] ||= "'#{[ch].pack("C")}'" }
+0x7f.upto(0xff) {|ch| C_CHAR_ESC[ch] = "'\\%03o'" % ch }
+def c_char_esc(str)
+  str.unpack("C*").map {|c| C_CHAR_ESC[c] }
 end
 
 $opt_f = false
@@ -166,61 +246,94 @@ end
 
 if $opt_f || $opt_t || true
   code = "/* This file is public domain. */\n\n"
-  if $opt_f
-    if !$opt_c
-      if $opt_d
-        name = $opt_n || 'mphf_param'
-      else
-        name = $opt_n || 'mphf'
+  if $opt_c
+    if $opt_H
+      if $opt_o && File.basename($opt_o) != 'mphash.h'
+        warn "common header name is not 'mphash.h'"
       end
+      code << "\#ifndef MPHASH_H\n"
+      code << "\#define MPHASH_H\n\n"
+      code << SECTIONS.fetch("common header")
+      code << SECTIONS.fetch('mphash utility declations')
+      code << "\#endif\n"
+    else
+      code << "\#include \"mphash.h\"\n\n"
+      code << MPHash::JENKINS_LOOKUP3
+      code << expand_template("", nil, 'mphash utility definitions')
     end
-    if $opt_c
-      if $opt_H
-        if $opt_o && File.basename($opt_o) != 'mphash.h'
-          warn "common header name is not 'mphash.h'"
-        end
-        code << "\#ifndef MPHASH_H\n"
-        code << "\#define MPHASH_H\n\n"
-        code << SECTIONS.fetch("common header")
-        code << SECTIONS.fetch('generic hash function declaration')
-        code << "\#endif\n"
-      else
+  elsif $opt_f
+    if $opt_d
+      name = $opt_n || 'mphf_param'
+    else
+      name = $opt_n || 'mphf'
+    end
+    if $opt_H
+      if $opt_d
         code << "\#include \"mphash.h\"\n\n"
-        code << MPHash::JENKINS_LOOKUP3
-        code << expand_template("", nil, 'generic hash function definition')
+        code << expand_template("", name, 'hash parameter declaration')
+      else
+        code << expand_template("", name, 'specific hash function declaration')
       end
     else
-      if $opt_H
-        if $opt_d
-          code << "\#include \"mphash.h\"\n\n"
-          code << expand_template("", name, 'hash parameter declaration')
-        else
-          code << expand_template("", name, 'specific hash function declaration')
-        end
+      keys = parse_keyfile(ARGF)
+      mphf = MPHash::MPHF.new(keys)
+      if $opt_d
+        code << "\#include \"mphash.h\"\n\n"
+        code << expand_funcdata_template("", name, 'hash parameter definition', mphf)
       else
-        keys = parse_keyfile(ARGF)
-        mphf = MPHash::MPHF.new(keys)
-        if $opt_d
-          code << "\#include \"mphash.h\"\n\n"
-          code << expand_funcdata_template("", name, 'hash parameter definition', mphf)
-        else
-          code << SECTIONS.fetch("common header")
-          code << expand_funcdata_template("static", "mphf_param", 'hash parameter definition', mphf)
-          code << MPHash::JENKINS_LOOKUP3
-          code << expand_template("static", "mphash_generic", 'generic hash function definition')
-          code << expand_template("", name, 'specific hash function definition', :param_name => "mphf_param")
-        end
+        code << SECTIONS.fetch("common header")
+        code << expand_funcdata_template("static", "mphf_param", 'hash parameter definition', mphf)
+        code << MPHash::JENKINS_LOOKUP3
+        code << expand_template("static", nil, 'mphash utility definitions')
+        code << expand_template("", name, 'specific hash function definition', :param_name => "&mphf_param")
+      end
+    end
+  elsif $opt_t
+    if $opt_d
+      name = $opt_n || 'mpht_param'
+    else
+      name = $opt_n || 'mpht'
+    end
+    if $opt_H
+      if $opt_d
+        code << "\#include \"mphash.h\"\n\n"
+        code << expand_template("", name, 'hash table declaration')
+      else
+        code << expand_template("", name, 'specific hash table declaration')
+      end
+    else
+      dict = parse_dictfile(ARGF)
+      keys = dict.map {|fields| fields[0] }
+      mphf = MPHash::MPHF.new(keys)
+      if $opt_d
+        code << "\#include \"mphash.h\"\n\n"
+        code << expand_funcdata_template("static", 'mphf_param', 'hash parameter definition', mphf)
+        code << expand_tabledata_template("", name, 'hash table definition', '&mphf_param', mphf, dict)
+      else
+        code << SECTIONS.fetch("common header")
+        code << expand_funcdata_template("static", "mphf_param", 'hash parameter definition', mphf)
+        code << expand_tabledata_template("static", "mpht_param", 'hash table definition', '&mphf_param', mphf, dict)
+        code << MPHash::JENKINS_LOOKUP3
+        code << expand_template("static", nil, 'mphash utility definitions')
+        code << expand_template("", name, 'specific hash table definition', :table_name => "&mpht_param")
       end
     end
   else
-    keys = parse_keyfile(ARGF)
-    mphf = MPHash::MPHF.new(keys)
+    dict = parse_anyfile(ARGF)
+    numfields = 0
+    dict.each {|fields|
+      numfields = fields.length if numfields < fields.length
+      fields << '' if fields.length < 2
+    }
+    mphf = MPHash::MPHF.new(dict.map {|fields| fields[0] })
     code << SECTIONS.fetch("common header")
     code << expand_funcdata_template("static", "mphf_param", 'hash parameter definition', mphf)
+    code << expand_tabledata_template("static", "mpht_param", 'hash table definition', '&mphf_param', mphf, dict)
     code << MPHash::JENKINS_LOOKUP3
-    code << expand_template("static", "mphash_generic", 'generic hash function definition')
-    code << expand_template("", 'mphf', 'specific hash function definition', :param_name => "mphf_param")
-    code << expand_template("", nil, 'test command main', :keys => keys)
+    code << expand_template("static", nil, 'mphash utility definitions')
+    code << expand_template("", 'mphf', 'specific hash function definition', :param_name => "&mphf_param")
+    code << expand_template("", 'mpht', 'specific hash table definition', :table_name => "&mpht_param")
+    code << expand_template("", nil, 'test command main', :dict => dict, :numfields => numfields)
   end
   gen_output(code)
 end
@@ -232,6 +345,8 @@ __END__
 #include <stdint.h>     /* for uint32_t */
 #include <stddef.h>     /* for size_t */
 
+#define MPHASH_NOT_A_KEY (~(uint32_t)0)
+
 typedef struct {
   uint32_t range;
   uint32_t salt0, salt1, salt2;
@@ -240,10 +355,24 @@ typedef struct {
   const unsigned char *ranking_small;
 } mphash_func_t;
 
+typedef struct {
+  uint32_t keyhash;
+  size_t offset;
+  size_t key_size;
+  size_t val_size;
+} mphash_table_entry_t;
+
+typedef struct {
+  const mphash_func_t *hash_param;
+  unsigned long num_entries;
+  const mphash_table_entry_t *entries;
+  const char *data;
+} mphash_table_t;
+
 /* section: hash parameter declaration */
 
 <%=linkage%>
-const mphash_func_t *<%=name%>;
+const mphash_func_t <%=name%>;
 
 /* section: hash parameter definition */
 
@@ -265,7 +394,8 @@ static const unsigned char <%=name%>_ranking_small[] = {
 % }
 };
 
-static const mphash_func_t <%=name%>_struct = {
+<%=linkage%>
+const mphash_func_t <%=name%> = {
   <%= range %>,
   <%= salts[0] %>, <%= salts[1] %>, <%= salts[2] %>,
   <%=name%>_g,
@@ -273,16 +403,16 @@ static const mphash_func_t <%=name%>_struct = {
   <%=name%>_ranking_small
 };
 
-<%=linkage%>
-const mphash_func_t *<%=name%> = &<%=name%>_struct;
-
-/* section: generic hash function declaration */
+/* section: mphash utility declations */
 
 extern uint32_t mphash_generic(
    const void *key, size_t length, const mphash_func_t *param,
    uint32_t *hash0_ret, uint32_t *hash1_ret, uint32_t *hash2_ret);
 
-/* section: generic hash function definition */
+extern const void *mphash_table_lookup(const void *key, size_t length,
+  const mphash_table_t *table, size_t *value_length);
+
+/* section: mphash utility definitions */
 
 /*---------------------------------------------------------------------*/
 /* minimal perfect hash function, by Tanaka Akira 2008, Public Domain. */
@@ -335,7 +465,7 @@ uint32_t mphash_generic(
   i = g[0] + g[1] + g[2];
   ph = h[i % 3];
   if (g[i % 3] == 3)
-    return ~(uint32_t)0;
+    return MPHASH_NOT_A_KEY;
   a = ph / RANK_BLOCKSIZE;
   b = ph % RANK_BLOCKSIZE;
   c = b % RANK_SMALLBLOCKSIZE;
@@ -361,6 +491,28 @@ uint32_t mphash_generic(
   }
   return mph;
 }
+
+#include <string.h>     /* for memcmp */
+
+<%=linkage%>
+const void *mphash_table_lookup(const void *key, size_t length,
+  const mphash_table_t *table, size_t *value_length)
+{
+  uint32_t index, hash;
+  const mphash_table_entry_t *entry;
+  index = mphash_generic(key, length, table->hash_param, &hash, NULL, NULL);
+  if (index == MPHASH_NOT_A_KEY)
+    return NULL;
+  entry = &table->entries[index];
+  if (hash != entry->keyhash || length != entry->key_size)
+    return NULL;
+  if (memcmp(key, &table->data[entry->offset], length) != 0)
+    return NULL;
+  if (value_length)
+    *value_length = entry->val_size;
+  return &table->data[entry->offset+entry->key_size];
+}
+
 /*---------------------------------------------------------------------*/
 
 /* section: specific hash function declaration */
@@ -379,20 +531,71 @@ uint32_t <%=name%>(const void *key, size_t length)
   return mphash_generic(key, length, <%=param_name%>, NULL, NULL, NULL);
 }
 
-/* section: test command main */
+/* section: hash table declaration */
 
-typedef struct {
-  size_t len;
-  char *key;
-} mphash_key_t;
+<%=linkage%>
+const mphash_table_t <%=name%>;
 
-mphash_key_t keys[] = {
-% keys.each {|key|
-  { <%=key.bytesize%>, <%=c_esc(key)%> },
+/* section: hash table definition */
+
+static const mphash_table_entry_t <%=name%>_entries[] = {
+% entries.each {|keyhash, offset, key_size, val_size|
+  { <%="0x%x" % keyhash%>, <%="0x%0x" % offset%>, <%=key_size%>, <%=val_size%> },
 % }
 };
 
-#define NUMKEYS <%=keys.length%>
+static const char <%=name%>_data[] = {
+% dict.each {|key, val|
+%   c_char_esc(key).each_slice(8) {|chs|
+<%=chs.map {|ch| "#{ch}," }.join%>
+%   }
+%   c_char_esc(val).each_slice(8) {|chs|
+  <%=chs.map {|ch| "#{ch}," }.join%>
+%   }
+% }
+};
+
+<%=linkage%>
+const mphash_table_t <%=name%> = {
+  <%=hash_param_name%>,
+  <%=entries.length%>,
+  <%=name%>_entries,
+  <%=name%>_data
+};
+
+/* section: specific hash table declaration */
+
+#include <stddef.h>
+#include <stdint.h>
+
+<%=linkage%>
+void *<%=name%>(const void *key, size_t length, size_t *value_length);
+
+/* section: specific hash table definition */
+
+<%=linkage%>
+const void *<%=name%>(const void *key, size_t length, size_t *value_length)
+{
+  return mphash_table_lookup(key, length, <%=table_name%>, value_length);
+}
+
+/* section: test command main */
+
+typedef struct {
+  size_t key_len;
+  char *key;
+  size_t val_len;
+  char *val;
+} mphash_pair_t;
+
+mphash_pair_t dict[] = {
+% dict.each {|key, val|
+  { <%=key.bytesize%>, <%=c_esc(key)%>, <%=val ? val.bytesize : 0%>, <%=val ? c_esc(val) : "NULL"%> },
+% }
+};
+
+#define NUMFIELDS <%=numfields%>
+#define NUMKEYS <%=dict.length%>
 
 #include <stdlib.h>     /* for exit */
 #include <unistd.h>     /* for getopt */
@@ -442,7 +645,7 @@ void showstr(FILE *fp, const char *str, size_t len)
 uint32_t check_mphf(const void *key, size_t length)
 {
   uint32_t h = mphf(key, length);
-  if (NUMKEYS <= h && h != ~(uint32_t)0) {
+  if (NUMKEYS <= h && h != MPHASH_NOT_A_KEY) {
     fprintf(stderr, "[bug] hash value out of range : %u ", h);
     showstr(stderr, key, length);
     fputc('\n', stderr);
@@ -455,35 +658,39 @@ void list(void)
 {
   unsigned long l;
   for (l = 0; l < NUMKEYS; l++) {
-    printf("%u ", check_mphf(keys[l].key, keys[l].len));
-    showstr(stdout, keys[l].key, keys[l].len);
+    printf("%u ", check_mphf(dict[l].key, dict[l].key_len));
+    showstr(stdout, dict[l].key, dict[l].key_len);
+#if 1 < NUMFIELDS
+    putchar(' ');
+    showstr(stdout, dict[l].val, dict[l].val_len);
+#endif
     putchar('\n');
   }
 }
 
 void validation(void)
 {
-  static mphash_key_t *list[NUMKEYS];
+  static mphash_pair_t *list[NUMKEYS];
   int fail = 0;
   unsigned long l;
   for (l = 0; l < NUMKEYS; l++) {
-    uint32_t h = mphf(keys[l].key, keys[l].len);
+    uint32_t h = mphf(dict[l].key, dict[l].key_len);
     if (NUMKEYS <= h) {
       fail = 1;
       printf("invalid hash value: %u ", h);
-      showstr(stdout, keys[l].key, keys[l].len);
+      showstr(stdout, dict[l].key, dict[l].key_len);
       putchar('\n');
       continue;
     }
     if (list[h]) {
       fail = 1;
       printf("collision found: %u ", h);
-      showstr(stdout, list[h]->key, list[h]->len);
+      showstr(stdout, list[h]->key, list[h]->key_len);
       putchar(' ');
-      showstr(stdout, keys[l].key, keys[l].len);
+      showstr(stdout, dict[l].key, dict[l].key_len);
       putchar('\n');
     }
-    list[h] = &keys[l];
+    list[h] = &dict[l];
   }
   if (!fail) {
     puts("ok");
@@ -494,8 +701,21 @@ void query(int argc, char **argv)
 {
   int i;
   for (i = 0; i < argc; i++) {
+    const void *key = argv[i];
     size_t len = strlen(argv[i]);
-    printf("%u\n", check_mphf(argv[i], len));
+    printf("%u", check_mphf(key, len));
+#if 1 < NUMFIELDS
+    {
+      size_t value_len;
+      const void *value = mpht(key, len, &value_len);
+      putchar(' ');
+      if (value)
+        showstr(stdout, value, value_len);
+      else
+        fputs("not found", stdout);
+    }
+#endif
+    putchar('\n');
   }
 }
 

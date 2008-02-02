@@ -45,7 +45,6 @@ unless Dir.respond_to? :mktmpdir
   end
 end
 
-
 class TestMPHF_CGen < Test::Unit::TestCase
   RUBY = [RbConfig::CONFIG["bindir"], RbConfig::CONFIG["ruby_install_name"]].join('/')
   MPHASH_SRCDIR = File.dirname(File.dirname(File.expand_path(__FILE__)))
@@ -173,4 +172,88 @@ End
       }
     }
   end
+
+  SMALL_ASSOC = [%w[foo hoge], %w[bar fuga]]
+  def test_table_self_contained
+    Dir.mktmpdir {|d|
+      Dir.chdir d
+      assoc = SMALL_ASSOC
+      write_file "dict", assoc.map {|k,v| "#{k} #{v}\n" }.join("")
+      run_mphash '-t', 'dict', '-o', 'table.c'
+      system(CC, '-c', 'table.c'); assert($?)
+      run_mphash '-tH', '-o', 'table.h'
+      write_file "tst.c", <<'End'
+#include "table.h"
+#include <stdio.h>
+#include <string.h>
+int main(int argc, char **argv)
+{
+  int i;
+  for (i = 1; i < argc; i++) {
+    size_t len;
+    void *val = mpht(argv[i], strlen(argv[i]), &len);
+    if (val)
+      printf("%.*s\n", (int)len, (char*)val);
+    else
+      puts("not-found");
+  }
+  return 0;
+}
+End
+      system(CC, '-c', 'tst.c'); assert($?)
+      system(CC, 'tst.o', 'table.o'); assert($?)
+      command = "./a.out #{assoc.map {|k,v| k }.join(" ")}"
+      result = `#{command}`
+      result = result.split(/\s+/)
+      assert_equal(assoc.length, result.length)
+      assoc.each_index {|i|
+        assert_equal(assoc[i][1], result[i])
+      }
+    }
+  end
+
+  def test_table_data_only
+    Dir.mktmpdir {|d|
+      Dir.chdir d
+      assoc = SMALL_ASSOC
+      write_file "dict", assoc.map {|k,v| "#{k} #{v}\n" }.join("")
+      run_mphash '-cH', '-o', 'mphash.h'
+      run_mphash '-c', '-o', 'mphash.c'
+      system(CC, '-c', 'mphash.c'); assert($?)
+      run_mphash '-td', 'dict', '-o', 'table.c'
+      system(CC, '-c', 'table.c'); assert($?)
+      run_mphash '-tdH', '-o', 'table.h'
+      write_file "tst.c", <<'End'
+#include "table.h"
+#include <stdio.h>
+#include <string.h>
+int main(int argc, char **argv)
+{
+  int i;
+  for (i = 1; i < argc; i++) {
+    size_t len;
+    const void *val = mphash_table_lookup(argv[i], strlen(argv[i]), &mpht_param, &len);
+    if (val)
+      printf("%.*s\n", (int)len, (char*)val);
+    else
+      puts("not-found");
+  }
+  return 0;
+}
+End
+      system(CC, '-c', 'tst.c')
+      assert($?)
+      system(CC, 'tst.o', 'table.o', 'mphash.o')
+      assert($?)
+      command = "./a.out #{assoc.map {|k,v| k }.join(" ")}"
+      command = "./a.out #{assoc.map {|k,v| k }.join(" ")}"
+      result = `#{command}`
+      result = result.split(/\s+/)
+      assert_equal(assoc.length, result.length)
+      assoc.each_index {|i|
+        assert_equal(assoc[i][1], result[i])
+      }
+    }
+  end
+
 end

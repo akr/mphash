@@ -13,82 +13,66 @@ http://www.a-k-r.org/mphash/
 == Feature
 
 * generate a minimal perfect hash function
+* hash table using the minimal perfect hash function
 * generate a C source code
   * generated source code is public domain
   * several module structures supported
     * single source file for self-contained command (testing purpose)
-    * foo.c and foo.h pair for single hash function 
+    * hash table or hash function
+    * foo.c and foo.h pair for single hash function/table
     * mphash.h, mphash.c, foo.h, foo.c, bar.h, bar.c, ... for multiple
-      hash functions
+      hash functions/tables
 
 == Usage
 
-=== Hash Function
+=== Simple Test Command Generation
 
-You need a file which contains keys.
+You need a file which contains key-value pairs.
 
-  % cat keyfile
-  foo
-  bar
-  baz
-  qux
-  quux
-  corge
-  grault
-  garply
-  waldo
-  fred
-  plugh
-  xyzzy
-  thud
+  % cat dictfile
+  foo hoge
+  bar fuga
+  baz "C-style quoted string is usable in keys and values"
+  qux moge
 
 mphash command generate a self-contained C source code as follows.
 It is just compilable.
 
-  % mphash keyfile -o hash.c
-  % gcc hash.c
+  % mphash dictfile -o tst.c
+  % gcc tst.c
 
-The binary compiled shows hash value for each keys.
-mphash assigned 0 to 12 for the 13 keys.
+The compiled binary shows hash code, keys and values.
+mphash assigned 0 to 3 for the 4 keys.
 
-  % ./a.out 
-  12 "foo"
-  2 "bar"
-  5 "baz"
-  7 "qux"
-  1 "quux"
-  11 "corge"
-  6 "grault"
-  0 "garply"
-  3 "waldo"
-  4 "fred"
-  9 "plugh"
-  10 "xyzzy"
-  8 "thud"
+  % ./a.out
+  2 "foo" "hoge"
+  1 "bar" "fuga"
+  3 "baz" "C-style quoted string is usable in keys and values"
+  0 "qux" "moge"
 
 The binary shows hash values for specified arguments.
 
-  % ./a.out foo baz thud
-  12
-  5
-  8
+  % ./a.out baz bar
+  3 "C-style quoted string is usable in keys and values"
+  1 "fuga"
 
 It is not an error to specify a non-key string.
-The hash function returns 4294967295 or some value in the assigned range (0-12).
-4294967295 means the string is not a key.
-However a value in the range doesn't mean the string is a key.
+The hash function returns 4294967295 or some value in the assigned range (0-3).
+4294967295 means the given string is not a key.
+However a hash code in the range doesn't mean the string is a key.
 
-  % ./a.out a aaaa  
-  4294967295
-  3
+  ./a.out a aa aaa
+  4294967295 not found
+  0 not found
+  3 not found
 
 mphash can be used for large key sets, /usr/share/dict/words for example.
-The 98568 words in the file are mapped to integers 0 to 98567. 
+The 98568 words in the file are mapped to integers 0 to 98567.
 
   % wc -w /usr/share/dict/words
   98568 /usr/share/dict/words
   % mphash /usr/share/dict/words -o words.c
-  % gcc words.c 
+  % gcc words.c
   % ./a.out|sort -n|tail
   98558 "licorice's"
   98559 "neodymium's"
@@ -101,36 +85,47 @@ The 98568 words in the file are mapped to integers 0 to 98567.
   98566 "moralizes"
   98567 "verdigris's"
 
+Note that the given file is single-column, table value is not shown.
+
 === Module Options
 
   # self-contained test command
   #
+  mphash -o command.c dictfile                  # source code including main
   mphash -o command.c keyfile                   # source code including main
+
+  # single hash table
+  #
+  # table.[ch] provides mpht().
+  # The function name is overridden by -n option.
+  #
+  mphash -tH [-n table_funcname] -o table.h             # declaration
+  mphash -t [-n table_funcname] -o table.c dictfile     # definition
 
   # single hash function
   #
-  # uint32_t mphf(const void *key, size_t length) is defined.
-  # The default function name is mphf.  It is overridden by -n option.
+  # hash.[ch] provides mphf().
+  # The function name is overridden by -n option.
   #
-  mphash -fH [-n funcname] -o hash.h            # header
-  mphash -f [-n funcname] -o hash.h keyfile     # funcname definition
+  mphash -fH [-n hash_funcname] -o hash.h               # declaration
+  mphash -f [-n hash_funcname] -o hash.c keyfile        # definition
 
-  # multiple hash functions (default data name is mphf_param)
+  # multiple hash tables/functions
   #
-  # uint32_t mphash_generic(
-  #   const void *key, size_t length, const mphash_func_t *param,
-  #   uint32_t *hash0_ret, uint32_t *hash1_ret, uint32_t *hash2_ret)
-  # is defined by mphash.c.
-  # const mphash_func_t *mphf_param is defined for each key.
-  # The default parameter name is mphf_param. -n option override it.
-  # mphash_generic(key, length, mphf_param, NULL, NULL, NULL) returns a hash value.
-  # If non-NULL value is specified for hash0_ret, hash1_ret, hash2_ret,
-  # internally calculated three 32bit hash value is stored.
+  # mphash.[ch] provides mphash_table_lookup() and mphash_generic().
   #
-  mphash -fcH -o mphash.h                       # common header
-  mphash -fc -o mphash.c                        # code for hash functions
-  mphash -fdH [-n dataname] -o hdata.h          # header for hash parameter
-  mphash -fd [-n dataname] -o hdata.h keyfile   # hash parameter
+  # tdata.[ch] provides mpht_param.
+  # The name is overridden by -n option.
+  #
+  # hdata.[ch] provides mphf_param.
+  # The name is overridden by -n option.
+  #
+  mphash -cH -o mphash.h                                # common declaration
+  mphash -c -o mphash.c                                 # common definition
+  mphash -tdH [-n table_dataname] -o tdata.h            # table declaration
+  mphash -td [-n table_dataname] -o tdata.h dictfile    # table definition
+  mphash -fdH [-n hash_dataname] -o hdata.h             # hash declaration
+  mphash -fd [-n hash_dataname] -o hdata.h keyfile      # hash definition
 
 == Requirements
 
