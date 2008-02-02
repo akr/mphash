@@ -201,6 +201,7 @@ if $opt_f || $opt_t || true
         keys = parse_keyfile(ARGF)
         mphf = MPHash::MPHF.new(keys)
         if $opt_d
+          code << "\#include \"mphash.h\"\n\n"
           code << expand_funcdata_template("", name, 'hash parameter definition', mphf)
         else
           code << SECTIONS.fetch("common header")
@@ -348,6 +349,9 @@ uint32_t mphash_generic(const void *key, size_t length, const mphash_func_t *par
 /*---------------------------------------------------------------------*/
 
 /* section: specific hash function declaration */
+
+#include <stddef.h>
+#include <stdint.h>
 
 <%=linkage%>
 uint32_t <%=name%>(const void *key, size_t length);
