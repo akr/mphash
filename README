@@ -15,10 +15,11 @@ http://www.a-k-r.org/mphash/
 * generate a minimal perfect hash function
 * generate a C source code
   * generated source code is public domain
-  * several module structures
-    * single source file for self-contained command
+  * several module structures supported
+    * single source file for self-contained command (testing purpose)
     * foo.c and foo.h pair for single hash function 
-    * mphash.h, mphash.c, foo.h, foo.c for multiple hash functions
+    * mphash.h, mphash.c, foo.h, foo.c, bar.h, bar.c, ... for multiple
+      hash functions
 
 == Usage
 
