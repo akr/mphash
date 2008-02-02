@@ -83,7 +83,7 @@ However a value in the range doesn't mean the string is a key.
   3
 
 mphash can be used for large key sets, /usr/share/dict/words for example.
-The 98568 words are mapped to integers 0 to 98567. 
+The 98568 words in the file are mapped to integers 0 to 98567. 
 
   % wc -w /usr/share/dict/words
   98568 /usr/share/dict/words
