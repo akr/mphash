@@ -304,7 +304,7 @@ uint32_t mphash_generic(const void *key, size_t length, const mphash_func_t *par
   uint32_t fullhash0, fullhash1, fullhash2;
   uint32_t h[3];
   uint32_t ph, mph, a, b, c, u0, u1;
-  int i;
+  int i, g[3];
   fullhash0 = param->salt0;
   fullhash1 = param->salt1;
   hashlittle2(key, length, &fullhash0, &fullhash1);
@@ -312,10 +312,13 @@ uint32_t mphash_generic(const void *key, size_t length, const mphash_func_t *par
   h[0] = fullhash0 % param->range;
   h[1] = (fullhash1 % param->range) + param->range;
   h[2] = (fullhash2 % param->range) + param->range*2;
-  i = ((param->g[h[0] / 16] >> (2 * (h[0] % 16))) & 0x3) +
-      ((param->g[h[1] / 16] >> (2 * (h[1] % 16))) & 0x3) +
-      ((param->g[h[2] / 16] >> (2 * (h[2] % 16))) & 0x3);
+  g[0] = (param->g[h[0] / 16] >> (2 * (h[0] % 16))) & 3;
+  g[1] = (param->g[h[1] / 16] >> (2 * (h[1] % 16))) & 3;
+  g[2] = (param->g[h[2] / 16] >> (2 * (h[2] % 16))) & 3;
+  i = g[0] + g[1] + g[2];
   ph = h[i % 3];
+  if (g[i % 3] == 3)
+    return ~(uint32_t)0;
   a = ph / RANK_BLOCKSIZE;
   b = ph % RANK_BLOCKSIZE;
   c = b % RANK_SMALLBLOCKSIZE;
@@ -388,7 +391,7 @@ void usage(int status)
   exit(status);
 }
 
-void showstr(FILE *fp, char *str, size_t len)
+void showstr(FILE *fp, const char *str, size_t len)
 {
   size_t i;
   fputc('"', fp);
@@ -416,11 +419,23 @@ void showstr(FILE *fp, char *str, size_t len)
   fputc('"', fp);
 }
 
+uint32_t check_mphf(const void *key, size_t length)
+{
+  uint32_t h = mphf(key, length);
+  if (NUMKEYS <= h && h != ~(uint32_t)0) {
+    fprintf(stderr, "[bug] hash value out of range : %u ", h);
+    showstr(stderr, key, length);
+    fputc('\n', stderr);
+  }
+  return h;
+}
+
+
 void list(void)
 {
   unsigned long l;
   for (l = 0; l < NUMKEYS; l++) {
-    printf("%u ", mphf(keys[l].key, keys[l].len));
+    printf("%u ", check_mphf(keys[l].key, keys[l].len));
     showstr(stdout, keys[l].key, keys[l].len);
     putchar('\n');
   }
@@ -460,7 +475,7 @@ void query(int argc, char **argv)
   int i;
   for (i = 0; i < argc; i++) {
     size_t len = strlen(argv[i]);
-    printf("%u\n", mphf(argv[i], len));
+    printf("%u\n", check_mphf(argv[i], len));
   }
 }
 

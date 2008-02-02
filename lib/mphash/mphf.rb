@@ -152,6 +152,9 @@ class MPHash
 
     def mphf(key)
       h = phf(key)
+      if @g[h] == @r
+        return -1 # no key
+      end
       a, b = h.divmod(RANK_BLOCKSIZE)
       if a == 0
         result = 0
