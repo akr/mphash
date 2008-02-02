@@ -82,9 +82,29 @@ However a value in the range doesn't mean the string is a key.
   4294967295
   3
 
+mphash can be used for large key sets, /usr/share/dict/words for example.
+The 98568 words are mapped to integers 0 to 98567. 
+
+  % wc -w /usr/share/dict/words
+  98568 /usr/share/dict/words
+  % mphash /usr/share/dict/words -o words.c
+  % gcc words.c 
+  % ./a.out|sort -n|tail
+  98558 "licorice's"
+  98559 "neodymium's"
+  98560 "Nader's"
+  98561 "begotten"
+  98562 "Tehran"
+  98563 "spunks"
+  98564 "druids"
+  98565 "glowworms"
+  98566 "moralizes"
+  98567 "verdigris's"
+
 == Requirements
 
-* Ruby 1.8 : http://www.ruby-lang.org/
+* Ruby 1.8.6-p111 : http://www.ruby-lang.org/
+  (older version may work)
 
 == Download
 
