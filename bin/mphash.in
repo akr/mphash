@@ -46,6 +46,7 @@ def parse_keyfile(io)
   lines = io.readlines
   result = []
   lines.each_with_index {|line, lineno|
+    next if /\A\s*\z/ =~ line
     line.chomp!
     lineno += 1
     if /\A"/ =~ line
@@ -55,7 +56,7 @@ def parse_keyfile(io)
       key = $1.gsub(/[^\\]|\\(?:([tnrfbaes])|\\([0-3][0-7][0-7])|\\([0-7][0-7]?)|\\(x[0-9a-fA-F][0-9a-fA-F]))/) {
         $+ ? C_UNESCAPE[$+] : $&
       }
-    elsif /\A(\w+)\s*\z/ =~ line
+    elsif /\A(\S+)\s*\z/ =~ line
       key = $1
     else
       raise "#{lineno}: unexpected line: #{line.inspect}"
@@ -86,32 +87,6 @@ def gen_output(code)
   File.rename(tmpname, $opt_o)
 end
 
-def gen_func_data(mphf, linkage, name, paramter=nil)
-  range = mphf.instance_variable_get(:@range)
-  hashtuple = mphf.instance_variable_get(:@hashtuple)
-  salts = hashtuple.instance_variable_get(:@salt)
-  g = mphf.instance_variable_get(:@g)
-  packed_g = []
-  g.each_slice(16) {|vs|
-    vs << 0 while vs.length < 16
-    vs.reverse!
-    packed_g << vs.inject(0) {|r, v| r * 4 + v }
-  }
-  formatted_g = packed_g.map {|v| "0x%x," % v }
-  formatted_g.last.sub!(/,/, '')
-  ranking = mphf.instance_variable_get(:@ranking)
-  formatted_ranking = ranking.map {|v| "0x%x," % v }
-  formatted_ranking << "0" if formatted_ranking.empty?
-  formatted_ranking.last.sub!(/,/, '')
-  ranking_small = mphf.instance_variable_get(:@ranking_small)
-  formatted_ranking_small = ranking_small.map {|v| "0x%x," % v }
-  formatted_ranking_small << "0" if formatted_ranking_small.empty?
-  formatted_ranking_small.last.sub!(/,/, '')
-
-  template = SECTIONS['hash parameter definition']
-  ERB.new(template, nil, '%').result(binding)
-end
-
 def expand_funcdata_template(linkage, name, template_name, mphf)
   range = mphf.instance_variable_get(:@range)
   hashtuple = mphf.instance_variable_get(:@hashtuple)
@@ -137,6 +112,15 @@ def expand_funcdata_template(linkage, name, template_name, mphf)
   ERB.new(SECTIONS[template_name], nil, '%').result(binding)
 end
 
+def expand_template(linkage, name, template_name, hash={})
+  code = ''
+  hash.each {|k, v|
+    code << "#{k} = hash[#{k.inspect}]\n"
+  }
+  code << 'ERB.new(SECTIONS[template_name], nil, "%").result(binding)'
+  eval code
+end
+
 C_ESC = {
   "\\" => "\\\\",
   '"' => '\"',
@@ -149,15 +133,6 @@ def c_esc(str)
   '"' + str.gsub(C_ESC_PAT) { C_ESC[$&] } + '"'
 end
 
-def expand_template(linkage, name, template_name, hash={})
-  code = ''
-  hash.each {|k, v|
-    code << "#{k} = hash[#{k.inspect}]\n"
-  }
-  code << 'ERB.new(SECTIONS[template_name], nil, "%").result(binding)'
-  eval code
-end
-
 $opt_f = false
 $opt_t = false
 
@@ -167,7 +142,6 @@ $opt_H = false
 
 $opt_o = nil
 $opt_n = nil
-
 
 op = OptionParser.new
 op.def_option('-h', '--help') { puts op; exit 0 }
@@ -400,15 +374,16 @@ mphash_key_t keys[] = {
 #include <stdlib.h>     /* for exit */
 #include <unistd.h>     /* for getopt */
 #include <string.h>     /* for strlen */
+#include <stdio.h>
 
 void usage(int status)
 {
   fputs(
 "usage: mphash-test-commnad [options]\n"
 "option: -h : print this message\n"
-"        -l : list keys and hash values (default action)\n"
+"        -l : list keys and hash values (default action for empty arguments)\n"
 "        -v : generated hash validation\n"
-"        -q arg1 arg2 ... : query hash value\n"
+"        -q arg1 arg2 ... : query hash value (default action for non-empty arguments)\n"
         , stdout);
   exit(status);
 }
@@ -512,6 +487,9 @@ int main(int argc, char **argv)
     }
   }
 
-  list();
+  if (optind < argc)
+    query(argc-optind, argv+optind);
+  else
+    list();
   return 0;
 }
