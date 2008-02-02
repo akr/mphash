@@ -26,7 +26,7 @@
 # IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
 # OF SUCH DAMAGE.
 
-# usage: txt2c.rb [-n varname] [-o destination] [source]
+# usage: ruby txt2c.rb [-n varname] [-o destination] [source]
 
 require 'optparse'
 require 'erb'
