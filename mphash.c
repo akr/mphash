@@ -29,7 +29,6 @@ OF SUCH DAMAGE.
 #include "ruby.h"
 #include <stdint.h>
 
-#define SELF_TEST 0
 #include "hash/lookup3.c"
 #include "code/code_lookup3.c"
 
