@@ -42,12 +42,17 @@ class MPHash
       @salt = (0...@r).map { HashTuple.gensalt }
     end
 
+    def makehash_with_hashes(str)
+      hs = MPHash.jenkins_lookup3_2(str, @salt[0], @salt[1]) << MPHash.jenkins_lookup3(str, @salt[2])
+      result = []
+      result << hs[0] % @range
+      result << (hs[1] % @range) + @min[1]
+      result << (hs[2] % @range) + @min[2]
+      return result, hs
+    end
+
     def makehash(str)
-      result = MPHash.jenkins_lookup3_2(str, @salt[0], @salt[1]) << MPHash.jenkins_lookup3(str, @salt[2])
-      result[0] = result[0] % @range
-      result[1] = (result[1] % @range) + @min[1]
-      result[2] = (result[2] % @range) + @min[2]
-      result
+      makehash_with_hashes(str).first
     end
   end
 
@@ -144,14 +149,14 @@ class MPHash
       }
     end
 
-    def phf(key)
-      hs = @hashtuple.makehash(key)
+    def phf_with_hashes(key)
+      hs, full_hs = @hashtuple.makehash_with_hashes(key)
       i = hs.inject(0) {|sum, h| sum + @g[h] }
-      hs[i % @r]
+      return hs[i % @r], full_hs
     end
 
-    def mphf(key)
-      h = phf(key)
+    def mphf_with_hashes(key)
+      h, full_hs = phf_with_hashes(key)
       if @g[h] == @r
         return -1 # no key
       end
@@ -168,7 +173,15 @@ class MPHash
       (h-c).upto(h-1) {|i|
         result += 1 if @g[i] != @r
       }
-      result
+      return result, full_hs
+    end
+
+    def phf(key)
+      phf_with_hashes(key).first
+    end
+
+    def mphf(key)
+      mphf_with_hashes(key).first
     end
   end
 end
