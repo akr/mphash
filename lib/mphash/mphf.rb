@@ -57,6 +57,7 @@ class MPHash
       @r = 3
       @n = keys.length
       @range = ((@n * 1.23).ceil + @r - 1) / @r
+      @range = 2 if @range <= 1
       @m = @range * @r
       ordered_edges = mapping(keys)
       assigning ordered_edges
