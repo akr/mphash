@@ -13,11 +13,77 @@ http://www.a-k-r.org/mphash/
 == Feature
 
 * generate a minimal perfect hash function
-* generate a C source code (the generated source code is public domain)
+* generate a C source code
+  * generated source code is public domain
+  * several module structures
+    * single source file for self-contained command
+    * foo.c and foo.h pair for single hash function 
+    * mphash.h, mphash.c, foo.h, foo.c for multiple hash functions
+
+== Usage
+
+=== Hash Function
+
+You need a file which contains keys.
+
+  % cat keyfile
+  foo
+  bar
+  baz
+  qux
+  quux
+  corge
+  grault
+  garply
+  waldo
+  fred
+  plugh
+  xyzzy
+  thud
+
+mphash command generate a self-contained C source code as follows.
+It is just compilable.
+
+  % mphash keyfile -o hash.c
+  % gcc hash.c
+
+The binary compiled shows hash value for each keys.
+mphash assigned 0 to 12 for the 13 keys.
+
+  % ./a.out 
+  12 "foo"
+  2 "bar"
+  5 "baz"
+  7 "qux"
+  1 "quux"
+  11 "corge"
+  6 "grault"
+  0 "garply"
+  3 "waldo"
+  4 "fred"
+  9 "plugh"
+  10 "xyzzy"
+  8 "thud"
+
+The binary shows hash values for specified arguments.
+
+  % ./a.out foo baz thud
+  12
+  5
+  8
+
+It is not an error to specify a non-key string.
+The hash function returns 4294967295 or some value in the assigned range (0-12).
+4294967295 means the string is not a key.
+However a value in the range doesn't mean the string is a key.
+
+  % ./a.out a aaaa  
+  4294967295
+  3
 
 == Requirements
 
-* ruby : http://www.ruby-lang.org/
+* Ruby 1.8 : http://www.ruby-lang.org/
 
 == Download
 
