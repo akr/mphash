@@ -7,6 +7,7 @@ end
 require 'mphash'
 require 'optparse'
 require 'erb'
+require 'enumerator'
 
 SECTIONS = {}
 section_name = nil
