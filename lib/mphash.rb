@@ -24,8 +24,10 @@
 # IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
 # OF SUCH DAMAGE.
 
+require 'mphash/missing'
 require 'mphash.so'
 require 'mphash/mphf'
+require 'mphash/escape'
 
 # MPHash is a class for minimal perfect hash.
 class MPHash
