@@ -58,7 +58,7 @@ def c_esc(str)
 end
 
 def c_char_esc(str)
-  MPHash.escape_as_c_character_list(str)
+  MPHash.escape_as_c_characters(str)
 end
 
 def parse_anyfile(io, fieldnum=nil)

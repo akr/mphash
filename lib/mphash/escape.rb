@@ -89,7 +89,7 @@ class MPHash
   0x00.upto(0x1f) {|ch| C_CHARACTER_ESCAPE[ch] ||= "'\\%03o'" % ch }
   0x20.upto(0x7f) {|ch| C_CHARACTER_ESCAPE[ch] ||= "'#{[ch].pack("C")}'" }
   0x7f.upto(0xff) {|ch| C_CHARACTER_ESCAPE[ch] = "'\\%03o'" % ch }
-  def MPHash.escape_as_c_character_list(str)
+  def MPHash.escape_as_c_characters(str)
     str.unpack("C*").map {|c| C_CHARACTER_ESCAPE[c] }
   end
 
