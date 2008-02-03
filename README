@@ -160,18 +160,18 @@ The keys and values can be quoted strings.
   #
   # mphash.[ch] provides mphash_table_lookup() and mphash_generic().
   #
-  # tdata.[ch] provides mpht_param.
+  # tparam.[ch] provides mpht_param.
   # The name is overridden by -n option.
   #
-  # hdata.[ch] provides mphf_param.
+  # hparam.[ch] provides mphf_param.
   # The name is overridden by -n option.
   #
   mphash -cH -o mphash.h                                # common declaration
   mphash -c -o mphash.c                                 # common definition
-  mphash -tdH [-n table_dataname] -o tdata.h            # table declaration
-  mphash -td [-n table_dataname] -o tdata.h dictfile    # table definition
-  mphash -fdH [-n hash_dataname] -o hdata.h             # hash declaration
-  mphash -fd [-n hash_dataname] -o hdata.h keyfile      # hash definition
+  mphash -tpH [-n table_paramname] -o tparam.h          # table declaration
+  mphash -tp [-n table_paramname] -o tparam.h dictfile  # table definition
+  mphash -fpH [-n hash_paramname] -o hparam.h           # hash declaration
+  mphash -fp [-n hash_paramname] -o hparam.h keyfile    # hash definition
 
 == Requirements
 
