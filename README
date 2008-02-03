@@ -92,7 +92,7 @@ Note that the given file is single-column, table value is not shown.
 
 === Quoted String
 
-quoted string is usable for keys and values.
+The keys and values can be quoted strings.
 
   % ruby -e '
   ARGF.each_line {|line|
