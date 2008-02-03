@@ -63,6 +63,35 @@ def str_undump(str)
   }
 end
 
+C_ESC = {
+  "\\" => "\\\\",
+  '"' => '\"',
+}
+C_MNEMONIC_ESCAPE.each {|mnemonic, ch| 
+  C_ESC[ch] = "\\#{mnemonic}"
+}
+0x00.upto(0x1f) {|ch| C_ESC[[ch].pack("C")] ||= "\\%03o" % ch }
+0x7f.upto(0xff) {|ch| C_ESC[[ch].pack("C")] = "\\%03o" % ch }
+C_ESC_PAT = Regexp.union(*C_ESC.keys)
+def c_esc(str)
+  '"' + str.gsub(C_ESC_PAT) { C_ESC[$&] } + '"'
+end
+
+C_CHAR_ESC = {
+  "0".ord => "'\\0'",
+  "\\".ord => "'\\\\'",
+  '\''.ord => "'\\\''",
+}
+C_MNEMONIC_ESCAPE.each {|mnemonic, ch| 
+  C_CHAR_ESC[ch.ord] = "'\\#{mnemonic}'"
+}
+0x00.upto(0x1f) {|ch| C_CHAR_ESC[ch] ||= "'\\%03o'" % ch }
+0x20.upto(0x7f) {|ch| C_CHAR_ESC[ch] ||= "'#{[ch].pack("C")}'" }
+0x7f.upto(0xff) {|ch| C_CHAR_ESC[ch] = "'\\%03o'" % ch }
+def c_char_esc(str)
+  str.unpack("C*").map {|c| C_CHAR_ESC[c] }
+end
+
 def parse_anyfile(io, fieldnum=nil)
   result = []
   lineno = 0
@@ -183,35 +212,6 @@ def expand_template(linkage, name, template_name, hash={})
   }
   code << 'ERB.new(SECTIONS[template_name], nil, "%").result(binding)'
   eval code
-end
-
-C_ESC = {
-  "\\" => "\\\\",
-  '"' => '\"',
-}
-C_MNEMONIC_ESCAPE.each {|mnemonic, ch| 
-  C_ESC[ch] = "\\#{mnemonic}"
-}
-0x00.upto(0x1f) {|ch| C_ESC[[ch].pack("C")] ||= "\\%03o" % ch }
-0x7f.upto(0xff) {|ch| C_ESC[[ch].pack("C")] = "\\%03o" % ch }
-C_ESC_PAT = Regexp.union(*C_ESC.keys)
-def c_esc(str)
-  '"' + str.gsub(C_ESC_PAT) { C_ESC[$&] } + '"'
-end
-
-C_CHAR_ESC = {
-  "0".ord => "'\\0'",
-  "\\".ord => "'\\\\'",
-  '\''.ord => "'\\\''",
-}
-C_MNEMONIC_ESCAPE.each {|mnemonic, ch| 
-  C_CHAR_ESC[ch.ord] = "'\\#{mnemonic}'"
-}
-0x00.upto(0x1f) {|ch| C_CHAR_ESC[ch] ||= "'\\%03o'" % ch }
-0x20.upto(0x7f) {|ch| C_CHAR_ESC[ch] ||= "'#{[ch].pack("C")}'" }
-0x7f.upto(0xff) {|ch| C_CHAR_ESC[ch] = "'\\%03o'" % ch }
-def c_char_esc(str)
-  str.unpack("C*").map {|c| C_CHAR_ESC[c] }
 end
 
 $opt_f = false
