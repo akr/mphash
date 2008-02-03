@@ -62,6 +62,7 @@ class MPHash
 
   # MPHF is a generator for minimal perfect hash function.
   class MPHF
+    # generate a minimal perfect hash function from an array of strings.
     def initialize(keys)
       keys = keys.dup
       @r = 3
@@ -171,7 +172,12 @@ class MPHash
     end
     # :startdoc:
 
-    def mphf_with_hashes(key)
+    # returns a pair of a hash code and an array of integers.
+    #
+    # The hash code is identical to one returned by hashcode method.
+    #
+    # The array contains three internal 32bit hash code for <i>key</i>.
+    def hashcode_with_internal_hashes(key)
       h, full_hs = phf_with_hashes(key)
       if @g[h] == @r
         return NON_KEY, full_hs # no key
@@ -200,8 +206,8 @@ class MPHash
     # MPHash::NON_KEY means the given <i>key</i> is not a key.
     # However <i>key</i> may not be a key even if the return value
     # is not MPHash::NON_KEY.
-    def mphf(key)
-      mphf_with_hashes(key).first
+    def hashcode(key)
+      hashcode_with_internal_hashes(key).first
     end
   end
 end

@@ -97,7 +97,7 @@ class TestMPHF_CGen < Test::Unit::TestCase
           h = $1.to_i
           k = $2
           assert(ary.include?(k))
-          assert_equal(mphf.mphf(k), h)
+          assert_equal(mphf.hashcode(k), h)
         }
       }
     }
@@ -134,7 +134,7 @@ End
       result = result.split(/\s+/)
       assert_equal(ary.length, result.length)
       ary.each_index {|i|
-        assert_equal(mphf.mphf(ary[i]), result[i].to_i)
+        assert_equal(mphf.hashcode(ary[i]), result[i].to_i)
       }
     }
   end
@@ -171,7 +171,7 @@ End
       result = result.split(/\s+/)
       assert_equal(ary.length, result.length)
       ary.each_index {|i|
-        assert_equal(mphf.mphf(ary[i]), result[i].to_i)
+        assert_equal(mphf.hashcode(ary[i]), result[i].to_i)
       }
     }
   end
@@ -288,7 +288,7 @@ End
       result = result.split(/\s+/)
       assert_equal(ary.length, result.length)
       ary.each_index {|i|
-        assert_equal(mphf.mphf(ary[i]), result[i].to_i)
+        assert_equal(mphf.hashcode(ary[i]), result[i].to_i)
       }
     }
   end

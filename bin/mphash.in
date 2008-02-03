@@ -199,7 +199,7 @@ def expand_tabledata_template(linkage, name, template_name, hash_param_name, mph
   }
   entries = []
   dict.each_with_index {|(k, v), src_index|
-    hash_index, full_hs = mphf.mphf_with_hashes(k)
+    hash_index, full_hs = mphf.hashcode_with_internal_hashes(k)
     entries[hash_index] = [full_hs[0], offsets[src_index], k.bytesize, v.bytesize]
   }
   ERB.new(SECTIONS[template_name], nil, '%').result(binding)

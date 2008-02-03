@@ -6,7 +6,7 @@ class TestMPHF < Test::Unit::TestCase
     mphf = MPHash::MPHF.new(keys)
     check = {}
     keys.each {|key|
-      hash = mphf.mphf(key)
+      hash = mphf.hashcode(key)
       assert_operator(0, :<=, hash)
       assert_operator(hash, :<, keys.length)
       assert_nil(check[hash], "collision: #{hash} : #{check[hash].inspect} #{key.inspect}")
@@ -14,7 +14,7 @@ class TestMPHF < Test::Unit::TestCase
     }
     10.times {
       key = rand.to_s
-      hash = mphf.mphf(key)
+      hash = mphf.hashcode(key)
       if hash != -1
         assert_operator(0, :<=, hash)
         assert_operator(hash, :<, keys.length)
