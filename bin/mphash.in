@@ -1,12 +1,5 @@
 #!/usr/bin/env ruby
 
-class String
-  alias bytesize size unless "".respond_to? :bytesize
-  unless "".respond_to? :ord
-    def ord() self[0] end
-  end
-end
-
 require 'mphash'
 require 'optparse'
 require 'erb'
@@ -27,69 +20,16 @@ DATA.each_line {|line|
   end
 }
 
-C_MNEMONIC_ESCAPE = {
-  't' => "\t",
-  'n' => "\n",
-  'r' => "\r",
-  'f' => "\f",
-  'b' => "\b",
-  'a' => "\a",
-  'v' => "\v"
-}
-
-SRC_UNESCAPE = {}
-SRC_UNESCAPE.update C_MNEMONIC_ESCAPE
-SRC_UNESCAPE['e'] = "\e"
-
-0.upto(0xff) {|c|
-  s = [c].pack("C")
-  oct = "%03o" % c
-  SRC_UNESCAPE[oct] = s
-  SRC_UNESCAPE[oct[1,2]] = s if /\A0/ =~ oct
-  SRC_UNESCAPE[oct[2,1]] = s if /\A00/ =~ oct
-  hex = "x%02x" % c
-  SRC_UNESCAPE[hex] = s
-}
-SRC_UNESCAPE['"'] = '"'
-SRC_UNESCAPE['\\'] = '\\'
-
-QUOTED_STRING_PAT = /"((?:[^\\"]|\\#{Regexp.union *SRC_UNESCAPE.keys})*)"/o
 def str_undump(str)
-  if /\A#{QUOTED_STRING_PAT}\z/o !~ str
-    raise "invalid quoting: #{str.inspect}"
-  end
-  key = $1.gsub(/[^\\"]|\\(#{Regexp.union *SRC_UNESCAPE.keys})/o) {
-    $1 ? SRC_UNESCAPE[$1] : $&
-  }
+  MPHash.str_undump(str)
 end
 
-C_ESC = {
-  "\\" => "\\\\",
-  '"' => '\"',
-}
-C_MNEMONIC_ESCAPE.each {|mnemonic, ch| 
-  C_ESC[ch] = "\\#{mnemonic}"
-}
-0x00.upto(0x1f) {|ch| C_ESC[[ch].pack("C")] ||= "\\%03o" % ch }
-0x7f.upto(0xff) {|ch| C_ESC[[ch].pack("C")] = "\\%03o" % ch }
-C_ESC_PAT = Regexp.union(*C_ESC.keys)
 def c_esc(str)
-  '"' + str.gsub(C_ESC_PAT) { C_ESC[$&] } + '"'
+  MPHash.escape_as_c_string(str)
 end
 
-C_CHAR_ESC = {
-  "0".ord => "'\\0'",
-  "\\".ord => "'\\\\'",
-  '\''.ord => "'\\\''",
-}
-C_MNEMONIC_ESCAPE.each {|mnemonic, ch| 
-  C_CHAR_ESC[ch.ord] = "'\\#{mnemonic}'"
-}
-0x00.upto(0x1f) {|ch| C_CHAR_ESC[ch] ||= "'\\%03o'" % ch }
-0x20.upto(0x7f) {|ch| C_CHAR_ESC[ch] ||= "'#{[ch].pack("C")}'" }
-0x7f.upto(0xff) {|ch| C_CHAR_ESC[ch] = "'\\%03o'" % ch }
 def c_char_esc(str)
-  str.unpack("C*").map {|c| C_CHAR_ESC[c] }
+  MPHash.escape_as_c_character_list(str)
 end
 
 def parse_anyfile(io, fieldnum=nil)
@@ -105,7 +45,7 @@ def parse_anyfile(io, fieldnum=nil)
       if str.empty?
         break
       elsif /\A"/ =~ str
-        if /\A#{QUOTED_STRING_PAT}/ !~ str
+        if /\A#{MPHash::QUOTED_STRING_PAT}/ !~ str
           error "#{lineno}: unexpected line format: #{line.inspect}"
         end
         str = $'
