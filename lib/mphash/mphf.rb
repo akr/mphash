@@ -158,7 +158,7 @@ class MPHash
     def mphf_with_hashes(key)
       h, full_hs = phf_with_hashes(key)
       if @g[h] == @r
-        return -1 # no key
+        return -1, full_hs # no key
       end
       a, b = h.divmod(RANK_BLOCKSIZE)
       if a == 0
