@@ -148,14 +148,14 @@ def expand_funcdata_template(linkage, name, template_name, mphf)
   }
   formatted_g = packed_g.map {|v| "0x%x," % v }
   formatted_g.last.sub!(/,/, '')
-  ranking = mphf.instance_variable_get(:@ranking)
-  formatted_ranking = ranking.map {|v| "0x%x," % v }
-  formatted_ranking << "0" if formatted_ranking.empty?
-  formatted_ranking.last.sub!(/,/, '')
-  ranking_small = mphf.instance_variable_get(:@ranking_small)
-  formatted_ranking_small = ranking_small.map {|v| "0x%x," % v }
-  formatted_ranking_small << "0" if formatted_ranking_small.empty?
-  formatted_ranking_small.last.sub!(/,/, '')
+  rs = mphf.instance_variable_get(:@rs)
+  formatted_rs = rs.map {|v| "0x%x," % v }
+  formatted_rs << "0" if formatted_rs.empty?
+  formatted_rs.last.sub!(/,/, '')
+  rb = mphf.instance_variable_get(:@rb)
+  formatted_rb = rb.map {|v| "0x%x," % v }
+  formatted_rb << "0" if formatted_rb.empty?
+  formatted_rb.last.sub!(/,/, '')
 
   ERB.new(SECTIONS[template_name], nil, '%').result(binding)
 end
@@ -351,8 +351,8 @@ typedef struct {
   uint32_t range;
   uint32_t salt0, salt1, salt2;
   const uint32_t *g;
-  const uint32_t *ranking;
-  const unsigned char *ranking_small;
+  const uint32_t *rs;
+  const unsigned char *rb;
 } mphash_func_t;
 
 typedef struct {
@@ -382,14 +382,14 @@ static const uint32_t <%=name%>_g[] = {
 % }
 };
 
-static const uint32_t <%=name%>_ranking[] = {
-% formatted_ranking.each_slice(6) {|vs|
+static const uint32_t <%=name%>_rs[] = {
+% formatted_rs.each_slice(6) {|vs|
     <%= vs.join('') %>
 % }
 };
 
-static const unsigned char <%=name%>_ranking_small[] = {
-% formatted_ranking_small.each_slice(7) {|vs|
+static const unsigned char <%=name%>_rb[] = {
+% formatted_rb.each_slice(7) {|vs|
     <%= vs.join('') %>
 % }
 };
@@ -399,8 +399,8 @@ const mphash_func_t <%=name%> = {
   <%= range %>,
   <%= salts[0] %>, <%= salts[1] %>, <%= salts[2] %>,
   <%=name%>_g,
-  <%=name%>_ranking,
-  <%=name%>_ranking_small
+  <%=name%>_rs,
+  <%=name%>_rb
 };
 
 /* section: mphash utility declations */
@@ -472,9 +472,9 @@ uint32_t mphash_generic(
   b = b / RANK_SMALLBLOCKSIZE;
   mph = 0;
   if (a != 0)
-    mph = param->ranking[a-1];
+    mph = param->rs[a-1];
   if (b != 0)
-    mph += param->ranking_small[a*(RANK_BLOCKSIZE/RANK_SMALLBLOCKSIZE-1)+b-1];
+    mph += param->rb[a*(RANK_BLOCKSIZE/RANK_SMALLBLOCKSIZE-1)+b-1];
   if (c != 0) {
     i = ph / RANK_SMALLBLOCKSIZE;
     u0 = param->g[i*2];
