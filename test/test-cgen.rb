@@ -3,6 +3,7 @@ require 'mphash'
 require 'rbconfig'
 require 'fileutils'
 require 'tmpdir'
+require 'erb'
 
 unless Dir.respond_to? :mktmpdir
   def Dir.mktmpdir(prefix_suffix=nil, tmpdir=nil)
@@ -331,6 +332,53 @@ End
       assoc.each_index {|i|
         assert_equal(assoc[i][1], result[i])
       }
+    }
+  end
+
+  def test_generate_c_character
+    Dir.mktmpdir {|d|
+      Dir.chdir d
+      chars = []
+      0.upto(255) {|c| chars << MPHash.escape_as_c_characters([c].pack("C")) }
+      write_file "tst.c", ERB.new(<<'End', nil, '%').result(binding)
+#include <stdio.h>
+int main(int argc, char **argv)
+{
+% chars.each {|c|
+  putchar(<%=c%>);
+% }
+  return 0;
+}
+End
+      assert_system(CC, 'tst.c')
+      result = `./a.out`
+      assert_equal(256, result.length)
+      assert_equal((0..255).to_a.pack("C"*256), result)
+    }
+  end
+
+  def test_generate_c_string
+    Dir.mktmpdir {|d|
+      Dir.chdir d
+      strs = []
+      0.upto(255) {|c| strs << MPHash.escape_as_c_string([c].pack("C")) }
+      write_file "tst.c", ERB.new(<<'End', nil, '%').result(binding)
+#include <unistd.h>
+int main(int argc, char **argv)
+{
+  int ret;
+% strs.each {|s|
+  if (sizeof(<%=s%>) != 2) return 1;
+  ret = write(1, <%=s%>, 1);
+  if (ret != 1) return 1;
+% }
+  return 0;
+}
+End
+      assert_system(CC, 'tst.c')
+      result = `./a.out`
+      assert_equal(256, result.length)
+      assert_equal((0..255).to_a.pack("C"*256), result)
     }
   end
 
