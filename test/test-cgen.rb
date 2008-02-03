@@ -149,9 +149,9 @@ End
       run_mphash '-cH', '-o', 'mphash.h'
       run_mphash '-c', '-o', 'mphash.c'
       assert_system(CC, '-c', 'mphash.c')
-      run_mphash '-fd', 'keyfile', '-o', 'hash.c'
+      run_mphash '-fp', 'keyfile', '-o', 'hash.c'
       assert_system(CC, '-c', 'hash.c')
-      run_mphash '-fdH', '-o', 'hash.h'
+      run_mphash '-fpH', '-o', 'hash.h'
       write_file "tst.c", <<'End'
 #include "hash.h"
 #include <stdio.h>
@@ -224,9 +224,9 @@ End
       run_mphash '-cH', '-o', 'mphash.h'
       run_mphash '-c', '-o', 'mphash.c'
       assert_system(CC, '-c', 'mphash.c')
-      run_mphash '-td', 'dict', '-o', 'table.c'
+      run_mphash '-tp', 'dict', '-o', 'table.c'
       assert_system(CC, '-c', 'table.c')
-      run_mphash '-tdH', '-o', 'table.h'
+      run_mphash '-tpH', '-o', 'table.h'
       write_file "tst.c", <<'End'
 #include "table.h"
 #include <stdio.h>
@@ -265,8 +265,8 @@ End
       write_file "keyfile", ary.join("\n")
       run_mphash '--static', '-cH', '-o', 'mphash.h'
       run_mphash '--static', '-c', '-o', 'mphash.c'
-      run_mphash '--static', '-fd', 'keyfile', '-o', 'hash.c'
-      run_mphash '--static', '-fdH', '-o', 'hash.h'
+      run_mphash '--static', '-fp', 'keyfile', '-o', 'hash.c'
+      run_mphash '--static', '-fpH', '-o', 'hash.h'
       write_file "tst.c", <<'End'
 #include "mphash.h"
 #include "mphash.c"
@@ -301,8 +301,8 @@ End
       write_file "dict", assoc.map {|k,v| "#{k} #{v}\n" }.join("")
       run_mphash '--static', '-cH', '-o', 'mphash.h'
       run_mphash '--static', '-c', '-o', 'mphash.c'
-      run_mphash '--static', '-td', 'dict', '-o', 'table.c'
-      run_mphash '--static', '-tdH', '-o', 'table.h'
+      run_mphash '--static', '-tp', 'dict', '-o', 'table.c'
+      run_mphash '--static', '-tpH', '-o', 'table.h'
       write_file "tst.c", <<'End'
 #include "mphash.h"
 #include "mphash.c"

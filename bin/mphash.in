@@ -133,7 +133,7 @@ def gen_output(code)
   File.rename(tmpname, $opt_o)
 end
 
-def expand_funcdata_template(linkage, name, template_name, mphf)
+def expand_funcparam_template(linkage, name, template_name, mphf)
   range = mphf.instance_variable_get(:@range)
   hashtuple = mphf.instance_variable_get(:@hashtuple)
   salts = hashtuple.instance_variable_get(:@salt)
@@ -158,7 +158,7 @@ def expand_funcdata_template(linkage, name, template_name, mphf)
   ERB.new(SECTIONS[template_name], nil, '%').result(binding)
 end
 
-def expand_tabledata_template(linkage, name, template_name, hash_param_name, mphf, dict)
+def expand_tableparam_template(linkage, name, template_name, hash_param_name, mphf, dict)
   offsets = []
   off = 0
   dict.each {|k, v|
@@ -187,7 +187,7 @@ $opt_f = false
 $opt_t = false
 
 $opt_c = false
-$opt_d = false
+$opt_p = false
 $opt_H = false
 
 # --static is intended to generate code fragments appropriate to include them.
@@ -205,12 +205,12 @@ op.banner = 'Usage: mphash [options] [keyfile/dictfile]'
 op.def_option('-h', '--help', 'show this message') { puts op; exit 0 }
 op.def_option('-f', '--function', 'generate hash function only') { $opt_f = true }
 op.def_option('-t', '--table', 'generate hash table') { $opt_t = true }
-op.def_option('-d', '--data', 'generate data only') { $opt_d = true }
-op.def_option('-c', '--code', 'generate common code for data by -d') { $opt_c = true }
+op.def_option('-p', '--param', 'generate parameter only') { $opt_p = true }
+op.def_option('-c', '--code', 'generate common code for parameter by -p') { $opt_c = true }
 op.def_option('-H', '--header', 'generate header file') { $opt_H = true }
 op.def_option('--static', 'make all function definitions static') { $opt_static = true }
 op.def_option('-o OUTPUT', '--output OUTPUT', 'specify output filename') {|arg| $opt_o = arg }
-op.def_option('-n NAME', '--name NAME', 'specify function/data name') {|arg| $opt_n = arg }
+op.def_option('-n NAME', '--name NAME', 'specify function/parameter name') {|arg| $opt_n = arg }
 op.parse!
 
 def error(message)
@@ -243,13 +243,13 @@ if $opt_f || $opt_t || true
       code << expand_template(code_linkage, nil, 'mphash utility definitions')
     end
   elsif $opt_f
-    if $opt_d
+    if $opt_p
       name = $opt_n || 'mphf_param'
     else
       name = $opt_n || 'mphf'
     end
     if $opt_H
-      if $opt_d
+      if $opt_p
         code << "\#include \"mphash.h\"\n\n" if !$opt_static
         code << expand_template(header_linkage, name, 'hash parameter declaration')
       else
@@ -258,25 +258,25 @@ if $opt_f || $opt_t || true
     else
       keys = parse_keyfile(ARGF)
       mphf = MPHash::MPHF.new(keys)
-      if $opt_d
+      if $opt_p
         code << "\#include \"mphash.h\"\n\n" if !$opt_static
-        code << expand_funcdata_template(code_linkage, name, 'hash parameter definition', mphf)
+        code << expand_funcparam_template(code_linkage, name, 'hash parameter definition', mphf)
       else
         code << SECTIONS.fetch("common header")
-        code << expand_funcdata_template("static", "mphf_param", 'hash parameter definition', mphf)
+        code << expand_funcparam_template("static", "mphf_param", 'hash parameter definition', mphf)
         code << MPHash::JENKINS_LOOKUP3
         code << expand_template("static", nil, 'mphash utility definitions')
         code << expand_template(code_linkage, name, 'specific hash function definition', :param_name => "&mphf_param")
       end
     end
   elsif $opt_t
-    if $opt_d
+    if $opt_p
       name = $opt_n || 'mpht_param'
     else
       name = $opt_n || 'mpht'
     end
     if $opt_H
-      if $opt_d
+      if $opt_p
         code << "\#include \"mphash.h\"\n\n" if !$opt_static
         code << expand_template(header_linkage, name, 'hash table declaration')
       else
@@ -286,14 +286,14 @@ if $opt_f || $opt_t || true
       dict = parse_dictfile(ARGF)
       keys = dict.map {|fields| fields[0] }
       mphf = MPHash::MPHF.new(keys)
-      if $opt_d
+      if $opt_p
         code << "\#include \"mphash.h\"\n\n" if !$opt_static
-        code << expand_funcdata_template("static", 'mphf_param', 'hash parameter definition', mphf)
-        code << expand_tabledata_template(code_linkage, name, 'hash table definition', '&mphf_param', mphf, dict)
+        code << expand_funcparam_template("static", 'mphf_param', 'hash parameter definition', mphf)
+        code << expand_tableparam_template(code_linkage, name, 'hash table definition', '&mphf_param', mphf, dict)
       else
         code << SECTIONS.fetch("common header")
-        code << expand_funcdata_template("static", "mphf_param", 'hash parameter definition', mphf)
-        code << expand_tabledata_template("static", "mpht_param", 'hash table definition', '&mphf_param', mphf, dict)
+        code << expand_funcparam_template("static", "mphf_param", 'hash parameter definition', mphf)
+        code << expand_tableparam_template("static", "mpht_param", 'hash table definition', '&mphf_param', mphf, dict)
         code << MPHash::JENKINS_LOOKUP3
         code << expand_template("static", nil, 'mphash utility definitions')
         code << expand_template(code_linkage, name, 'specific hash table definition', :table_name => "&mpht_param")
@@ -308,8 +308,8 @@ if $opt_f || $opt_t || true
     }
     mphf = MPHash::MPHF.new(dict.map {|fields| fields[0] })
     code << SECTIONS.fetch("common header")
-    code << expand_funcdata_template("static", "mphf_param", 'hash parameter definition', mphf)
-    code << expand_tabledata_template("static", "mpht_param", 'hash table definition', '&mphf_param', mphf, dict)
+    code << expand_funcparam_template("static", "mphf_param", 'hash parameter definition', mphf)
+    code << expand_tableparam_template("static", "mpht_param", 'hash table definition', '&mphf_param', mphf, dict)
     code << MPHash::JENKINS_LOOKUP3
     code << expand_template("static", nil, 'mphash utility definitions')
     code << expand_template("", 'mphf', 'specific hash function definition', :param_name => "&mphf_param")
