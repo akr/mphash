@@ -232,15 +232,15 @@ $opt_o = nil
 $opt_n = nil
 
 op = OptionParser.new
-op.def_option('-h', '--help') { puts op; exit 0 }
+op.def_option('-h', '--help', 'show this message') { puts op; exit 0 }
 op.def_option('-f', '--function', 'generate hash function only') { $opt_f = true }
 op.def_option('-t', '--table', 'generate hash table') { $opt_t = true }
 op.def_option('-d', '--data', 'generate data only') { $opt_d = true }
 op.def_option('-c', '--code', 'generate common code for data by -d') { $opt_c = true }
 op.def_option('-H', '--header', 'generate header file') { $opt_H = true }
 op.def_option('--static', 'make all function definitions static') { $opt_static = true }
-op.def_option('-o OUTPUT', '--output OUTPUT') {|arg| $opt_o = arg }
-op.def_option('-n NAME', '--name NAME') {|arg| $opt_n = arg }
+op.def_option('-o OUTPUT', '--output OUTPUT', 'specify output filename') {|arg| $opt_o = arg }
+op.def_option('-n NAME', '--name NAME', 'specify function/data name') {|arg| $opt_n = arg }
 op.parse!
 
 def error(message)
