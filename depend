@@ -42,10 +42,13 @@ all: bin/mphash
 bin/mphash: bin/mphash.in
 	$(RUBY) fix-shebang.rb -o $@ $<
 
-install: install-bin
+install: install-bin install-man
 
 install-bin: bin/mphash
 	$(INSTALL_PROG) $< $(bindir)
+
+install-man: mphash.man
+	$(INSTALL_DATA) $< $(mandir)/man1/mphash.1
 
 clean: clean-bin
 
