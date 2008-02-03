@@ -201,6 +201,16 @@ optional:
 See rdoc/index.html or
 http://www.a-k-r.org/mphash/rdoc/
 
+== References
+
+Botelho, F.C., Pagh, R. and Ziviani, N.
+"Simple and Space-Efficient Minimal Perfect Hash Functions"
+10th International Workshop on Algorithms and Data Structures (WADS07) August 2007, 139-150
+
+Daisuke Okanohara
+"Bep: Associative Arrays for Very Large Collections"
+http://www-tsujii.is.s.u-tokyo.ac.jp/~hillbig/bep.htm
+
 == License
 
 === mphash itself
