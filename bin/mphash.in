@@ -350,7 +350,7 @@ typedef struct {
   const mphash_func_t *hash_param;
   unsigned long num_entries;
   const mphash_table_entry_t *entries;
-  const char *data;
+  const char *kvdata;
 } mphash_table_t;
 
 /******** section: hash parameter declaration */
@@ -492,11 +492,11 @@ const void *mphash_table_lookup(const void *key, size_t length,
   entry = &table->entries[index];
   if (hash != entry->keyhash || length != entry->key_size)
     return NULL;
-  if (memcmp(key, &table->data[entry->offset], length) != 0)
+  if (memcmp(key, &table->kvdata[entry->offset], length) != 0)
     return NULL;
   if (value_length)
     *value_length = entry->val_size;
-  return &table->data[entry->offset+entry->key_size];
+  return &table->kvdata[entry->offset+entry->key_size];
 }
 
 /*---------------------------------------------------------------------*/
@@ -530,7 +530,7 @@ static const mphash_table_entry_t <%=name%>_entries[] = {
 % }
 };
 
-static const char <%=name%>_data[] = {
+static const char <%=name%>_kvdata[] = {
 % dict.each {|key, val|
 %   c_char_esc(key).each_slice(8) {|chs|
 <%=chs.map {|ch| "#{ch}," }.join%>
@@ -546,7 +546,7 @@ const mphash_table_t <%=name%> = {
   <%=hash_param_name%>,
   <%=entries.length%>,
   <%=name%>_entries,
-  <%=name%>_data
+  <%=name%>_kvdata
 };
 
 /******** section: specific hash table declaration */
