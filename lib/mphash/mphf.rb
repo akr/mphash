@@ -153,13 +153,17 @@ class MPHash
         k += 1
       }
     end
-    # :startdoc:
+
+    def phf(key)
+      phf_with_hashes(key).first
+    end
 
     def phf_with_hashes(key)
       hs, full_hs = @hashtuple.makehash_with_hashes(key)
       i = hs.inject(0) {|sum, h| sum + @g[h] }
       return hs[i % @r], full_hs
     end
+    # :startdoc:
 
     def mphf_with_hashes(key)
       h, full_hs = phf_with_hashes(key)
@@ -180,10 +184,6 @@ class MPHash
         result += 1 if @g[i] != @r
       }
       return result, full_hs
-    end
-
-    def phf(key)
-      phf_with_hashes(key).first
     end
 
     # returns a hash code of <i>key</i>.
