@@ -79,7 +79,7 @@ class MPHash
   end
 
   C_CHARACTER_ESCAPE = {
-    "0".ord => "'\\0'",
+    "\0".ord => "'\\0'",
     "\\".ord => "'\\\\'",
     '\''.ord => "'\\\''",
   }
