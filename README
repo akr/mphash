@@ -67,6 +67,8 @@ However a hash code in the range doesn't mean the string is a key.
   0 not found
   3 not found
 
+=== Large Set
+
 mphash can be used for large key sets, /usr/share/dict/words for example.
 The 98568 words in the file are mapped to integers 0 to 98567.
 
@@ -87,6 +89,40 @@ The 98568 words in the file are mapped to integers 0 to 98567.
   98567 "verdigris's"
 
 Note that the given file is single-column, table value is not shown.
+
+=== Quoted String
+
+quoted string is usable for keys and values.
+
+  % ruby -e '
+  ARGF.each_line {|line|
+    next if /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S.*\S)\s*$/ !~ line
+    puts "#{$4.dump} #{[$1.to_i, $2.to_i, $3.to_i].pack("CCC").dump}"
+  }' /usr/share/X11/rgb.txt > colordict
+  % head colordict 
+  "snow" "\377\372\372"
+  "ghost white" "\370\370\377"
+  "GhostWhite" "\370\370\377"
+  "white smoke" "\365\365\365"
+  "WhiteSmoke" "\365\365\365"
+  "gainsboro" "\334\334\334"
+  "floral white" "\377\372\360"
+  "FloralWhite" "\377\372\360"
+  "old lace" "\375\365\346"
+  "OldLace" "\375\365\346"
+  % mphash colordict > color.c
+  % gcc color.c 
+  % ./a.out|head
+  483 "snow" "\377\372\372"
+  287 "ghost white" "\370\370\377"
+  430 "GhostWhite" "\370\370\377"
+  151 "white smoke" "\365\365\365"
+  632 "WhiteSmoke" "\365\365\365"
+  661 "gainsboro" "\334\334\334"
+  708 "floral white" "\377\372\360"
+  145 "FloralWhite" "\377\372\360"
+  567 "old lace" "\375\365\346"
+  87 "OldLace" "\375\365\346"
 
 === Module Options
 
