@@ -232,6 +232,7 @@ $opt_o = nil
 $opt_n = nil
 
 op = OptionParser.new
+op.banner = 'Usage: mphash [options] [keyfile/dictfile]'
 op.def_option('-h', '--help', 'show this message') { puts op; exit 0 }
 op.def_option('-f', '--function', 'generate hash function only') { $opt_f = true }
 op.def_option('-t', '--table', 'generate hash table') { $opt_t = true }
