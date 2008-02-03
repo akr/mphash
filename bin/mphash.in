@@ -357,7 +357,7 @@ __END__
 #include <stdint.h>     /* for uint32_t */
 #include <stddef.h>     /* for size_t */
 
-#define MPHASH_NOT_A_KEY (~(uint32_t)0)
+#define MPHASH_NON_KEY (~(uint32_t)0)
 
 typedef struct {
   uint32_t range;
@@ -479,7 +479,7 @@ uint32_t mphash_generic(
   i = g[0] + g[1] + g[2];
   ph = h[i % 3];
   if (g[i % 3] == 3)
-    return MPHASH_NOT_A_KEY;
+    return MPHASH_NON_KEY;
   a = ph / RANK_BLOCKSIZE;
   b = ph % RANK_BLOCKSIZE;
   c = b % RANK_SMALLBLOCKSIZE;
@@ -515,7 +515,7 @@ const void *mphash_table_lookup(const void *key, size_t length,
   uint32_t index, hash;
   const mphash_table_entry_t *entry;
   index = mphash_generic(key, length, table->hash_param, &hash, NULL, NULL);
-  if (index == MPHASH_NOT_A_KEY)
+  if (index == MPHASH_NON_KEY)
     return NULL;
   entry = &table->entries[index];
   if (hash != entry->keyhash || length != entry->key_size)
@@ -659,7 +659,7 @@ void showstr(FILE *fp, const char *str, size_t len)
 uint32_t check_mphf(const void *key, size_t length)
 {
   uint32_t h = mphf(key, length);
-  if (NUMKEYS <= h && h != MPHASH_NOT_A_KEY) {
+  if (NUMKEYS <= h && h != MPHASH_NON_KEY) {
     fprintf(stderr, "[bug] hash value out of range : %u ", h);
     showstr(stderr, key, length);
     fputc('\n', stderr);

@@ -25,6 +25,8 @@
 # OF SUCH DAMAGE.
 
 class MPHash
+  NON_KEY = -1
+
   # :stopdoc:
   class HashTuple
     @saltcounter = 0
@@ -162,7 +164,7 @@ class MPHash
     def mphf_with_hashes(key)
       h, full_hs = phf_with_hashes(key)
       if @g[h] == @r
-        return -1, full_hs # no key
+        return NON_KEY, full_hs # no key
       end
       a, b = h.divmod(RANK_BLOCKSIZE)
       if a == 0
@@ -184,6 +186,14 @@ class MPHash
       phf_with_hashes(key).first
     end
 
+    # returns a hash code of <i>key</i>.
+    #
+    # The return value is 0 to number of keys minus one, or
+    # MPHash::NON_KEY.
+    #
+    # MPHash::NON_KEY means the given <i>key</i> is not a key.
+    # However <i>key</i> may not be a key even if the return value
+    # is not MPHash::NON_KEY.
     def mphf(key)
       mphf_with_hashes(key).first
     end
