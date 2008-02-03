@@ -65,6 +65,7 @@ class MPHash
     # generate a minimal perfect hash function from an array of strings.
     def initialize(keys)
       keys = keys.dup
+      check_keys keys
       @r = 3
       @n = keys.length
       @range = ((@n * 1.23).ceil + @r - 1) / @r
@@ -81,6 +82,16 @@ class MPHash
     end
 
     # :stopdoc:
+    def check_keys(keys)
+      h = {}
+      keys.each {|k|
+        if h[k]
+          raise ArgumentError, "duplicate key: #{k.inspect}"
+        end
+        h[k] = true
+      }
+    end
+
     def mapping(keys)
       begin
         hashtuple = HashTuple.new(@r, @range)
