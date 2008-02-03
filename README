@@ -14,14 +14,12 @@ http://www.a-k-r.org/mphash/
 
 * generate a minimal perfect hash function
 * hash table using the minimal perfect hash function
-* generate a C source code
-  * generated source code is public domain
-  * several module structures supported
-    * single source file for self-contained command (testing purpose)
-    * hash table or hash function
-    * foo.c and foo.h pair for single hash function/table
-    * mphash.h, mphash.c, foo.h, foo.c, bar.h, bar.c, ... for multiple
-      hash functions/tables
+* generate a C source code (generated code is public domain)
+  * single source file for self-contained command (testing purpose)
+  * hash table or hash function
+  * foo.c and foo.h pair for single hash function/table
+  * mphash.h, mphash.c, foo.h, foo.c, bar.h, bar.c, ... for multiple
+    hash functions/tables
 
 == Usage
 
