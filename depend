@@ -31,9 +31,11 @@ code/code_lookup3.c: hash/lookup3.c txt2c.rb
 	test -d code || mkdir code
 	$(RUBY) txt2c.rb -o $@ $<
 
-rdoc: mphash.c
+rdoc/created.rid: README mphash.c lib/mphash/mphf.rb lib/mphash.rb
 	rm -rf rdoc
-	rdoc --op rdoc mphash.c
+	rdoc --op rdoc README mphash.c lib/mphash/mphf.rb lib/mphash.rb
+
+rdoc: rdoc/created.rid
 
 all: bin/mphash
 

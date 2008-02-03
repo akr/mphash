@@ -25,6 +25,7 @@
 # OF SUCH DAMAGE.
 
 class MPHash
+  # :stopdoc:
   class HashTuple
     @saltcounter = 0
 
@@ -55,6 +56,7 @@ class MPHash
       makehash_with_hashes(str).first
     end
   end
+  # :startdoc:
 
   class MPHF
     def initialize(keys)
@@ -69,6 +71,7 @@ class MPHash
       ranking
     end
 
+    # :stopdoc:
     def mapping(keys)
       begin
         hashtuple = HashTuple.new(@r, @range)
@@ -148,6 +151,7 @@ class MPHash
         k += 1
       }
     end
+    # :startdoc:
 
     def phf_with_hashes(key)
       hs, full_hs = @hashtuple.makehash_with_hashes(key)

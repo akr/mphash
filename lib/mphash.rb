@@ -26,3 +26,7 @@
 
 require 'mphash.so'
 require 'mphash/mphf'
+
+# MPHash is a class for minimal perfect hash.
+class MPHash
+end

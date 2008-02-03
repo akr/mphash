@@ -28,6 +28,7 @@ http://www.a-k-r.org/mphash/
 === Simple Test Command Generation
 
 You need a file which contains key-value pairs.
+(If a value is ommitted, an empty string is assumed.)
 
   % cat dictfile
   foo hoge
