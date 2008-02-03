@@ -205,7 +205,7 @@ op.banner = 'Usage: mphash [options] [keyfile/dictfile]'
 op.def_option('-h', '--help', 'show this message') { puts op; exit 0 }
 op.def_option('-f', '--function', 'generate hash function only') { $opt_f = true }
 op.def_option('-t', '--table', 'generate hash table') { $opt_t = true }
-op.def_option('-p', '--param', 'generate parameter only') { $opt_p = true }
+op.def_option('-p', '--parameter', 'generate parameter only') { $opt_p = true }
 op.def_option('-c', '--code', 'generate common code for parameter by -p') { $opt_c = true }
 op.def_option('-H', '--header', 'generate header file') { $opt_H = true }
 op.def_option('--static', 'make all function definitions static') { $opt_static = true }
