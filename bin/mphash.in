@@ -15,7 +15,7 @@ require 'enumerator'
 SECTIONS = {}
 section_name = nil
 DATA.each_line {|line|
-  if %r{^\/\* section: (.*) \*\/\n} =~ line
+  if %r{^\/\*\*\*\*\*\*\*\* section: (.*) \*\/\n} =~ line
     section_name = $1
     SECTIONS[section_name] = ''
   elsif section_name == nil
@@ -352,7 +352,7 @@ end
 
 __END__
 
-/* section: common header */
+/******** section: common header */
 
 #include <stdint.h>     /* for uint32_t */
 #include <stddef.h>     /* for size_t */
@@ -381,12 +381,12 @@ typedef struct {
   const char *data;
 } mphash_table_t;
 
-/* section: hash parameter declaration */
+/******** section: hash parameter declaration */
 
 <%=linkage%>
 const mphash_func_t <%=name%>;
 
-/* section: hash parameter definition */
+/******** section: hash parameter definition */
 
 static const uint32_t <%=name%>_g[] = {
 % formatted_g.each_slice(6) {|vs|
@@ -415,7 +415,7 @@ const mphash_func_t <%=name%> = {
   <%=name%>_rb
 };
 
-/* section: mphash utility declations */
+/******** section: mphash utility declations */
 
 <%=linkage%>
 uint32_t mphash_generic(
@@ -426,7 +426,7 @@ uint32_t mphash_generic(
 const void *mphash_table_lookup(const void *key, size_t length,
   const mphash_table_t *table, size_t *value_length);
 
-/* section: mphash utility definitions */
+/******** section: mphash utility definitions */
 
 /*---------------------------------------------------------------------*/
 /* minimal perfect hash function, by Tanaka Akira 2008, Public Domain. */
@@ -529,7 +529,7 @@ const void *mphash_table_lookup(const void *key, size_t length,
 
 /*---------------------------------------------------------------------*/
 
-/* section: specific hash function declaration */
+/******** section: specific hash function declaration */
 
 #include <stddef.h>
 #include <stdint.h>
@@ -537,7 +537,7 @@ const void *mphash_table_lookup(const void *key, size_t length,
 <%=linkage%>
 uint32_t <%=name%>(const void *key, size_t length);
 
-/* section: specific hash function definition */
+/******** section: specific hash function definition */
 
 <%=linkage%>
 uint32_t <%=name%>(const void *key, size_t length)
@@ -545,12 +545,12 @@ uint32_t <%=name%>(const void *key, size_t length)
   return mphash_generic(key, length, <%=param_name%>, NULL, NULL, NULL);
 }
 
-/* section: hash table declaration */
+/******** section: hash table declaration */
 
 <%=linkage%>
 const mphash_table_t <%=name%>;
 
-/* section: hash table definition */
+/******** section: hash table definition */
 
 static const mphash_table_entry_t <%=name%>_entries[] = {
 % entries.each {|keyhash, offset, key_size, val_size|
@@ -577,7 +577,7 @@ const mphash_table_t <%=name%> = {
   <%=name%>_data
 };
 
-/* section: specific hash table declaration */
+/******** section: specific hash table declaration */
 
 #include <stddef.h>
 #include <stdint.h>
@@ -585,7 +585,7 @@ const mphash_table_t <%=name%> = {
 <%=linkage%>
 void *<%=name%>(const void *key, size_t length, size_t *value_length);
 
-/* section: specific hash table definition */
+/******** section: specific hash table definition */
 
 <%=linkage%>
 const void *<%=name%>(const void *key, size_t length, size_t *value_length)
@@ -593,7 +593,7 @@ const void *<%=name%>(const void *key, size_t length, size_t *value_length)
   return mphash_table_lookup(key, length, <%=table_name%>, value_length);
 }
 
-/* section: test command main */
+/******** section: test command main */
 
 typedef struct {
   size_t key_len;
