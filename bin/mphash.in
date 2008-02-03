@@ -26,7 +26,8 @@
 # IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
 # OF SUCH DAMAGE.
 
-# template for code generation is public domain.  Tanaka Akira.
+# This file contains code generation templates.
+# They are public domain.  Tanaka Akira.
 
 require 'mphash'
 require 'optparse'
@@ -318,7 +319,10 @@ if $opt_f || $opt_t || true
   gen_output(code)
 end
 
+
 __END__
+
+Code Generation Templates.
 
 /******** section: common header */
 
