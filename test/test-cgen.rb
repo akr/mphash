@@ -72,6 +72,11 @@ class TestMPHF_CGen < Test::Unit::TestCase
     MPHash::MPHF.new(keys)
   end
 
+  def assert_system(*args)
+    system(*args)
+    assert($?.success?)
+  end
+
   SAMPLE_ARRAYS = [
     %w[foo bar baz],
     (0..1000).map { rand.to_s }
@@ -83,7 +88,7 @@ class TestMPHF_CGen < Test::Unit::TestCase
         mphf = make_mhpf(ary)
         write_file "keyfile", ary.join("\n")
         run_mphash 'keyfile', '-o', 'tst.c'
-        system(CC, 'tst.c'); assert($?)
+        assert_system(CC, 'tst.c')
         list = `./a.out`
         list.each_line {|line|
           pat = /\A(\d+) "(.*)"\n\z/
@@ -107,7 +112,7 @@ class TestMPHF_CGen < Test::Unit::TestCase
       mphf = make_mhpf(ary)
       write_file "keyfile", ary.join("\n")
       run_mphash '-f', 'keyfile', '-o', 'hash.c'
-      system(CC, '-c', 'hash.c'); assert($?)
+      assert_system(CC, '-c', 'hash.c')
       run_mphash '-fH', '-o', 'hash.h'
       write_file "tst.c", <<'End'
 #include "hash.h"
@@ -122,8 +127,8 @@ int main(int argc, char **argv)
   return 0;
 }
 End
-      system(CC, '-c', 'tst.c'); assert($?)
-      system(CC, 'tst.o', 'hash.o'); assert($?)
+      assert_system(CC, '-c', 'tst.c')
+      assert_system(CC, 'tst.o', 'hash.o')
       command = "./a.out #{ary.join(" ")}"
       result = `#{command}`
       result = result.split(/\s+/)
@@ -142,9 +147,9 @@ End
       write_file "keyfile", ary.join("\n")
       run_mphash '-cH', '-o', 'mphash.h'
       run_mphash '-c', '-o', 'mphash.c'
-      system(CC, '-c', 'mphash.c'); assert($?)
+      assert_system(CC, '-c', 'mphash.c')
       run_mphash '-fd', 'keyfile', '-o', 'hash.c'
-      system(CC, '-c', 'hash.c'); assert($?)
+      assert_system(CC, '-c', 'hash.c')
       run_mphash '-fdH', '-o', 'hash.h'
       write_file "tst.c", <<'End'
 #include "hash.h"
@@ -159,10 +164,8 @@ int main(int argc, char **argv)
   return 0;
 }
 End
-      system(CC, '-c', 'tst.c')
-      assert($?)
-      system(CC, 'tst.o', 'hash.o', 'mphash.o')
-      assert($?)
+      assert_system(CC, '-c', 'tst.c')
+      assert_system(CC, 'tst.o', 'hash.o', 'mphash.o')
       command = "./a.out #{ary.join(" ")}"
       result = `#{command}`
       result = result.split(/\s+/)
@@ -180,7 +183,7 @@ End
       assoc = SMALL_ASSOC
       write_file "dict", assoc.map {|k,v| "#{k} #{v}\n" }.join("")
       run_mphash '-t', 'dict', '-o', 'table.c'
-      system(CC, '-c', 'table.c'); assert($?)
+      assert_system(CC, '-c', 'table.c')
       run_mphash '-tH', '-o', 'table.h'
       write_file "tst.c", <<'End'
 #include "table.h"
@@ -200,8 +203,8 @@ int main(int argc, char **argv)
   return 0;
 }
 End
-      system(CC, '-c', 'tst.c'); assert($?)
-      system(CC, 'tst.o', 'table.o'); assert($?)
+      assert_system(CC, '-c', 'tst.c')
+      assert_system(CC, 'tst.o', 'table.o')
       command = "./a.out #{assoc.map {|k,v| k }.join(" ")}"
       result = `#{command}`
       result = result.split(/\s+/)
@@ -219,9 +222,9 @@ End
       write_file "dict", assoc.map {|k,v| "#{k} #{v}\n" }.join("")
       run_mphash '-cH', '-o', 'mphash.h'
       run_mphash '-c', '-o', 'mphash.c'
-      system(CC, '-c', 'mphash.c'); assert($?)
+      assert_system(CC, '-c', 'mphash.c')
       run_mphash '-td', 'dict', '-o', 'table.c'
-      system(CC, '-c', 'table.c'); assert($?)
+      assert_system(CC, '-c', 'table.c')
       run_mphash '-tdH', '-o', 'table.h'
       write_file "tst.c", <<'End'
 #include "table.h"
@@ -241,10 +244,8 @@ int main(int argc, char **argv)
   return 0;
 }
 End
-      system(CC, '-c', 'tst.c')
-      assert($?)
-      system(CC, 'tst.o', 'table.o', 'mphash.o')
-      assert($?)
+      assert_system(CC, '-c', 'tst.c')
+      assert_system(CC, 'tst.o', 'table.o', 'mphash.o')
       command = "./a.out #{assoc.map {|k,v| k }.join(" ")}"
       command = "./a.out #{assoc.map {|k,v| k }.join(" ")}"
       result = `#{command}`
