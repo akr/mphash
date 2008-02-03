@@ -60,6 +60,7 @@ class MPHash
   end
   # :startdoc:
 
+  # MPHF is a generator for minimal perfect hash function.
   class MPHF
     def initialize(keys)
       keys = keys.dup
@@ -71,6 +72,11 @@ class MPHash
       ordered_edges = mapping(keys)
       assigning ordered_edges
       ranking
+    end
+
+    # returns number of keys.
+    def size
+      @n
     end
 
     # :stopdoc:
