@@ -221,16 +221,24 @@ $opt_c = false
 $opt_d = false
 $opt_H = false
 
+# --static is intended to generate code fragments appropriate to include them.
+# * All function definitions are static.
+# * No #include directive.
+#   So generated code is filename independent.
+#   However client code need to include fragments in appropriate order.
+$opt_static = false
+
 $opt_o = nil
 $opt_n = nil
 
 op = OptionParser.new
 op.def_option('-h', '--help') { puts op; exit 0 }
-op.def_option('-f', '--function') { $opt_f = true }
-op.def_option('-t', '--table') { $opt_t = true }
-op.def_option('-d', '--data') { $opt_d = true }
-op.def_option('-c', '--code') { $opt_c = true }
-op.def_option('-H', '--header') { $opt_H = true }
+op.def_option('-f', '--function', 'generate hash function only') { $opt_f = true }
+op.def_option('-t', '--table', 'generate hash table') { $opt_t = true }
+op.def_option('-d', '--data', 'generate data only') { $opt_d = true }
+op.def_option('-c', '--code', 'generate common code for data by -d') { $opt_c = true }
+op.def_option('-H', '--header', 'generate header file') { $opt_H = true }
+op.def_option('--static', 'make all function definitions static') { $opt_static = true }
 op.def_option('-o OUTPUT', '--output OUTPUT') {|arg| $opt_o = arg }
 op.def_option('-n NAME', '--name NAME') {|arg| $opt_n = arg }
 op.parse!
@@ -244,6 +252,9 @@ if $opt_f && $opt_t
   error "exclusive options given: -f and -t"
 end
 
+header_linkage = $opt_static ? 'static' : 'extern'
+code_linkage = $opt_static ? 'static' : ''
+
 if $opt_f || $opt_t || true
   code = "/* This file is public domain. */\n\n"
   if $opt_c
@@ -251,15 +262,15 @@ if $opt_f || $opt_t || true
       if $opt_o && File.basename($opt_o) != 'mphash.h'
         warn "common header name is not 'mphash.h'"
       end
-      code << "\#ifndef MPHASH_H\n"
-      code << "\#define MPHASH_H\n\n"
+      code << "\#ifndef MPHASH_H\n" if !$opt_static
+      code << "\#define MPHASH_H\n\n" if !$opt_static
       code << SECTIONS.fetch("common header")
-      code << SECTIONS.fetch('mphash utility declations')
-      code << "\#endif\n"
+      code << expand_template(header_linkage, nil, 'mphash utility declations')
+      code << "\#endif\n" if !$opt_static
     else
-      code << "\#include \"mphash.h\"\n\n"
+      code << "\#include \"mphash.h\"\n\n" if !$opt_static
       code << MPHash::JENKINS_LOOKUP3
-      code << expand_template("", nil, 'mphash utility definitions')
+      code << expand_template(code_linkage, nil, 'mphash utility definitions')
     end
   elsif $opt_f
     if $opt_d
@@ -269,23 +280,23 @@ if $opt_f || $opt_t || true
     end
     if $opt_H
       if $opt_d
-        code << "\#include \"mphash.h\"\n\n"
-        code << expand_template("", name, 'hash parameter declaration')
+        code << "\#include \"mphash.h\"\n\n" if !$opt_static
+        code << expand_template(header_linkage, name, 'hash parameter declaration')
       else
-        code << expand_template("", name, 'specific hash function declaration')
+        code << expand_template(header_linkage, name, 'specific hash function declaration')
       end
     else
       keys = parse_keyfile(ARGF)
       mphf = MPHash::MPHF.new(keys)
       if $opt_d
-        code << "\#include \"mphash.h\"\n\n"
-        code << expand_funcdata_template("", name, 'hash parameter definition', mphf)
+        code << "\#include \"mphash.h\"\n\n" if !$opt_static
+        code << expand_funcdata_template(code_linkage, name, 'hash parameter definition', mphf)
       else
         code << SECTIONS.fetch("common header")
         code << expand_funcdata_template("static", "mphf_param", 'hash parameter definition', mphf)
         code << MPHash::JENKINS_LOOKUP3
         code << expand_template("static", nil, 'mphash utility definitions')
-        code << expand_template("", name, 'specific hash function definition', :param_name => "&mphf_param")
+        code << expand_template(code_linkage, name, 'specific hash function definition', :param_name => "&mphf_param")
       end
     end
   elsif $opt_t
@@ -296,26 +307,26 @@ if $opt_f || $opt_t || true
     end
     if $opt_H
       if $opt_d
-        code << "\#include \"mphash.h\"\n\n"
-        code << expand_template("", name, 'hash table declaration')
+        code << "\#include \"mphash.h\"\n\n" if !$opt_static
+        code << expand_template(header_linkage, name, 'hash table declaration')
       else
-        code << expand_template("", name, 'specific hash table declaration')
+        code << expand_template(header_linkage, name, 'specific hash table declaration')
       end
     else
       dict = parse_dictfile(ARGF)
       keys = dict.map {|fields| fields[0] }
       mphf = MPHash::MPHF.new(keys)
       if $opt_d
-        code << "\#include \"mphash.h\"\n\n"
+        code << "\#include \"mphash.h\"\n\n" if !$opt_static
         code << expand_funcdata_template("static", 'mphf_param', 'hash parameter definition', mphf)
-        code << expand_tabledata_template("", name, 'hash table definition', '&mphf_param', mphf, dict)
+        code << expand_tabledata_template(code_linkage, name, 'hash table definition', '&mphf_param', mphf, dict)
       else
         code << SECTIONS.fetch("common header")
         code << expand_funcdata_template("static", "mphf_param", 'hash parameter definition', mphf)
         code << expand_tabledata_template("static", "mpht_param", 'hash table definition', '&mphf_param', mphf, dict)
         code << MPHash::JENKINS_LOOKUP3
         code << expand_template("static", nil, 'mphash utility definitions')
-        code << expand_template("", name, 'specific hash table definition', :table_name => "&mpht_param")
+        code << expand_template(code_linkage, name, 'specific hash table definition', :table_name => "&mpht_param")
       end
     end
   else
@@ -405,11 +416,13 @@ const mphash_func_t <%=name%> = {
 
 /* section: mphash utility declations */
 
-extern uint32_t mphash_generic(
+<%=linkage%>
+uint32_t mphash_generic(
    const void *key, size_t length, const mphash_func_t *param,
    uint32_t *hash0_ret, uint32_t *hash1_ret, uint32_t *hash2_ret);
 
-extern const void *mphash_table_lookup(const void *key, size_t length,
+<%=linkage%>
+const void *mphash_table_lookup(const void *key, size_t length,
   const mphash_table_t *table, size_t *value_length);
 
 /* section: mphash utility definitions */

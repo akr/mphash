@@ -247,6 +247,83 @@ End
       assert_system(CC, '-c', 'tst.c')
       assert_system(CC, 'tst.o', 'table.o', 'mphash.o')
       command = "./a.out #{assoc.map {|k,v| k }.join(" ")}"
+      result = `#{command}`
+      result = result.split(/\s+/)
+      assert_equal(assoc.length, result.length)
+      assoc.each_index {|i|
+        assert_equal(assoc[i][1], result[i])
+      }
+    }
+  end
+
+  def test_static_hash_func
+    Dir.mktmpdir {|d|
+      Dir.chdir d
+      ary = SMALL_ARRAY
+      mphf = make_mhpf(ary)
+      write_file "keyfile", ary.join("\n")
+      run_mphash '--static', '-cH', '-o', 'mphash.h'
+      run_mphash '--static', '-c', '-o', 'mphash.c'
+      run_mphash '--static', '-fd', 'keyfile', '-o', 'hash.c'
+      run_mphash '--static', '-fdH', '-o', 'hash.h'
+      write_file "tst.c", <<'End'
+#include "mphash.h"
+#include "mphash.c"
+#include "hash.h"
+#include "hash.c"
+#include <stdio.h>
+#include <string.h>
+int main(int argc, char **argv)
+{
+  int i;
+  for (i = 1; i < argc; i++) {
+    printf("%d\n", mphash_generic(argv[i], strlen(argv[i]), &mphf_param, NULL, NULL, NULL));
+  }
+  return 0;
+}
+End
+      assert_system(CC, 'tst.c')
+      command = "./a.out #{ary.join(" ")}"
+      result = `#{command}`
+      result = result.split(/\s+/)
+      assert_equal(ary.length, result.length)
+      ary.each_index {|i|
+        assert_equal(mphf.mphf(ary[i]), result[i].to_i)
+      }
+    }
+  end
+
+  def test_static_hash_table
+    Dir.mktmpdir {|d|
+      Dir.chdir d
+      assoc = SMALL_ASSOC
+      write_file "dict", assoc.map {|k,v| "#{k} #{v}\n" }.join("")
+      run_mphash '--static', '-cH', '-o', 'mphash.h'
+      run_mphash '--static', '-c', '-o', 'mphash.c'
+      run_mphash '--static', '-td', 'dict', '-o', 'table.c'
+      run_mphash '--static', '-tdH', '-o', 'table.h'
+      write_file "tst.c", <<'End'
+#include "mphash.h"
+#include "mphash.c"
+#include "table.h"
+#include "table.c"
+#include <stdio.h>
+#include <string.h>
+int main(int argc, char **argv)
+{
+  int i;
+  for (i = 1; i < argc; i++) {
+    size_t len;
+    const void *val = mphash_table_lookup(argv[i], strlen(argv[i]), &mpht_param, &len);
+    if (val)
+      printf("%.*s\n", (int)len, (char*)val);
+    else
+      puts("not-found");
+  }
+  return 0;
+}
+End
+      assert_system(CC, 'tst.c')
       command = "./a.out #{assoc.map {|k,v| k }.join(" ")}"
       result = `#{command}`
       result = result.split(/\s+/)
