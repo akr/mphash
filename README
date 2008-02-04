@@ -194,6 +194,7 @@ The keys and values can be quoted strings.
 
 optional:
 
+  % make test
   % make rdoc
 
 == Reference Manual
