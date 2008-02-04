@@ -382,4 +382,34 @@ End
     }
   end
 
+  def test_generate_c_string_suffix
+    Dir.mktmpdir {|d|
+      Dir.chdir d
+      pairs = []
+      0.upto(255) {|c|
+        s = [c].pack("C")+"0"
+        pairs << [s, MPHash.escape_as_c_string(s)]
+      }
+      write_file "tst.c", ERB.new(<<'End', nil, '%').result(binding)
+#include <unistd.h>
+int main(int argc, char **argv)
+{
+  int ret;
+% pairs.each {|s, escaped|
+  if (sizeof(<%=escaped%>) != <%=s.length+1%>) return 1;
+  ret = write(1, <%=escaped%>, <%=s.length%>);
+  if (ret != <%=s.length%>) return 1;
+% }
+  return 0;
+}
+End
+      assert_system(CC, 'tst.c')
+      result = `./a.out`
+      assert($?.success?, $?.inspect)
+      assert_equal(512, result.length)
+      expected = pairs.map {|pair| pair.first}.join('')
+      assert_equal(expected, result)
+    }
+  end
+
 end
