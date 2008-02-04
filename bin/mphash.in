@@ -53,7 +53,7 @@ def str_undump(str)
   MPHash.str_undump(str)
 end
 
-def c_esc(str)
+def c_str_esc(str)
   MPHash.escape_as_c_string(str)
 end
 
@@ -576,7 +576,7 @@ typedef struct {
 
 mphash_pair_t dict[] = {
 % dict.each {|key, val|
-  { <%=key.bytesize%>, <%=c_esc(key)%>, <%=val ? val.bytesize : 0%>, <%=val ? c_esc(val) : "NULL"%> },
+  { <%=key.bytesize%>, <%=c_str_esc(key)%>, <%=val ? val.bytesize : 0%>, <%=val ? c_str_esc(val) : "NULL"%> },
 % }
 };
 
