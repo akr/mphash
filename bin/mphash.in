@@ -658,56 +658,50 @@ void show_invalid_hash_value(uint32_t h, void *key, size_t len)
   putchar('\n');
 }
 
-void list(void)
-{
-  unsigned long l;
-  memset(validation_list, 0, sizeof(validation_list));
-  for (l = 0; l < NUMKEYS; l++) {
-    uint32_t h = check_mphf(dict[l].key, dict[l].key_len);
-    printf("%u ", h);
-    showstr(stdout, dict[l].key, dict[l].key_len);
-#if 1 < NUMFIELDS
-    putchar(' ');
-    showstr(stdout, dict[l].val, dict[l].val_len);
-#endif
-    putchar('\n');
-    if (h == MPHASH_NON_KEY) {
-      fflush(stdout);
-      show_invalid_hash_value(h, dict[l].key, dict[l].key_len);
-      exit(1);
-    }
-    if (validation_list[h]) {
-      fflush(stdout);
-      show_collision(stderr, h,
-                     validation_list[h]->key, validation_list[h]->key_len,
-                     dict[l].key, dict[l].key_len);
-      exit(1);
-    }
-    validation_list[h] = &dict[l];
-  }
-}
-
-void validation(void)
+void list(int validation_only)
 {
   int fail = 0;
   unsigned long l;
   memset(validation_list, 0, sizeof(validation_list));
   for (l = 0; l < NUMKEYS; l++) {
-    uint32_t h = mphf(dict[l].key, dict[l].key_len);
+    void *key = dict[l].key;
+    size_t len = dict[l].key_len;
+    uint32_t h = mphf(key, len);
+    if (!validation_only) {
+      printf("%u ", h);
+      showstr(stdout, key, len);
+#if 1 < NUMFIELDS
+      putchar(' ');
+      showstr(stdout, val, len);
+#endif
+      putchar('\n');
+    }
+    if (h == MPHASH_NON_KEY) {
+      fail = 1;
+      fflush(stdout);
+      show_invalid_hash_value(h, key, len);
+      if (!validation_only) exit(1); else continue;
+    }
     if (NUMKEYS <= h) {
       fail = 1;
-      show_invalid_hash_value(h, dict[l].key, dict[l].key_len);
-      continue;
+      fprintf(stderr, "hash value out of range : %u ", h);
+      showstr(stderr, key, len);
+      fputc('\n', stderr);
+      if (!validation_only) exit(1); else continue;
     }
     if (validation_list[h]) {
       fail = 1;
-      show_collision(stdout, h,
+      fflush(stdout);
+      show_collision(stderr, h,
                      validation_list[h]->key, validation_list[h]->key_len,
-                     dict[l].key, dict[l].key_len);
+                     key, len);
+      if (!validation_only) exit(1); else continue;
     }
     validation_list[h] = &dict[l];
   }
-  if (!fail) {
+  if (validation_only) {
+    if (fail)
+      exit(1);
     puts("ok");
   }
 }
@@ -746,8 +740,8 @@ int main(int argc, char **argv)
       case '?':
         exit(1);
 
-      case 'l': list(); exit(0);
-      case 'v': validation(); exit(0);
+      case 'l': list(0); exit(0);
+      case 'v': list(1); exit(0);
       case 'q': query(argc-optind, argv+optind); exit(0);
     }
   }
@@ -755,6 +749,6 @@ int main(int argc, char **argv)
   if (optind < argc)
     query(argc-optind, argv+optind);
   else
-    list();
+    list(0);
   return 0;
 }
