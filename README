@@ -106,7 +106,7 @@ The keys and values can be quoted strings.
   % ruby -e '
   ARGF.each_line {|line|
     next if /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S.*\S)\s*$/ !~ line
-    puts "#{$4.dump} #{[$1.to_i, $2.to_i, $3.to_i].pack("CCC").dump}"
+    printf "\"%s\" \"\\%03o\\%03o\\%03o\"\n", $4, $1.to_i, $2.to_i, $3.to_i
   }' /usr/share/X11/rgb.txt > colordict
   % head colordict 
   "snow" "\377\372\372"
