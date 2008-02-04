@@ -54,3 +54,7 @@ clean: clean-bin
 
 clean-bin:
 	@-$(RM) bin/mphash
+
+.PHONY: test
+test:
+	$(RUBY) -Ilib test-all.rb
