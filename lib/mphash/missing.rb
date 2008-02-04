@@ -30,5 +30,14 @@ class String
   unless "".respond_to? :ord
     def ord() self[0] end
   end
+
+  if "".respond_to? :force_encoding
+    def force_binary
+      force_encoding("ascii-8bit")
+    end
+  else
+    def force_binary
+    end
+  end
 end
 # :startdoc:

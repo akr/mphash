@@ -339,7 +339,7 @@ End
     Dir.mktmpdir {|d|
       Dir.chdir d
       chars = []
-      0.upto(255) {|c| chars << MPHash.escape_as_c_characters([c].pack("C")) }
+      0.upto(255) {|c| chars.concat MPHash.escape_as_c_characters([c].pack("C")) }
       write_file "tst.c", ERB.new(<<'End', nil, '%').result(binding)
 #include <stdio.h>
 int main(int argc, char **argv)
@@ -352,6 +352,7 @@ int main(int argc, char **argv)
 End
       assert_system(CC, 'tst.c')
       result = `./a.out`
+      result.force_binary
       assert_equal(256, result.length)
       assert_equal((0..255).to_a.pack("C"*256), result)
     }
@@ -377,6 +378,7 @@ int main(int argc, char **argv)
 End
       assert_system(CC, 'tst.c')
       result = `./a.out`
+      result.force_binary
       assert_equal(256, result.length)
       assert_equal((0..255).to_a.pack("C"*256), result)
     }
@@ -405,6 +407,7 @@ int main(int argc, char **argv)
 End
       assert_system(CC, 'tst.c')
       result = `./a.out`
+      result.force_binary
       assert($?.success?, $?.inspect)
       assert_equal(512, result.length)
       expected = pairs.map {|pair| pair.first}.join('')
