@@ -635,48 +635,77 @@ uint32_t check_mphf(const void *key, size_t length)
     fprintf(stderr, "[bug] hash value out of range : %u ", h);
     showstr(stderr, key, length);
     fputc('\n', stderr);
+    exit(1);
   }
   return h;
 }
 
+static mphash_pair_t *validation_list[NUMKEYS];
+
+void show_collision(FILE *fp, uint32_t h, const void *key1, size_t len1, const void *key2, size_t len2)
+{
+  fprintf(fp, "collision found: %u ", h);
+  showstr(fp, key1, len1);
+  fputc(' ', fp);
+  showstr(fp, key2, len2);
+  fputc('\n', fp);
+}
+
+void show_invalid_hash_value(uint32_t h, void *key, size_t len)
+{
+  printf("invalid hash value: %u ", h);
+  showstr(stdout, key, len);
+  putchar('\n');
+}
 
 void list(void)
 {
   unsigned long l;
+  memset(validation_list, 0, sizeof(validation_list));
   for (l = 0; l < NUMKEYS; l++) {
-    printf("%u ", check_mphf(dict[l].key, dict[l].key_len));
+    uint32_t h = check_mphf(dict[l].key, dict[l].key_len);
+    printf("%u ", h);
     showstr(stdout, dict[l].key, dict[l].key_len);
 #if 1 < NUMFIELDS
     putchar(' ');
     showstr(stdout, dict[l].val, dict[l].val_len);
 #endif
     putchar('\n');
+    if (h == MPHASH_NON_KEY) {
+      fflush(stdout);
+      show_invalid_hash_value(h, dict[l].key, dict[l].key_len);
+      exit(1);
+    }
+    if (validation_list[h]) {
+      fflush(stdout);
+      show_collision(stderr, h,
+                     validation_list[h]->key, validation_list[h]->key_len,
+                     dict[l].key, dict[l].key_len);
+      exit(1);
+    }
+    validation_list[h] = &dict[l];
   }
 }
 
 void validation(void)
 {
-  static mphash_pair_t *list[NUMKEYS];
   int fail = 0;
   unsigned long l;
+  memset(validation_list, 0, sizeof(validation_list));
   for (l = 0; l < NUMKEYS; l++) {
     uint32_t h = mphf(dict[l].key, dict[l].key_len);
     if (NUMKEYS <= h) {
       fail = 1;
-      printf("invalid hash value: %u ", h);
-      showstr(stdout, dict[l].key, dict[l].key_len);
-      putchar('\n');
+      show_invalid_hash_value(h, dict[l].key, dict[l].key_len);
       continue;
     }
-    if (list[h]) {
+    if (validation_list[h]) {
       fail = 1;
-      printf("collision found: %u ", h);
-      showstr(stdout, list[h]->key, list[h]->key_len);
-      putchar(' ');
-      showstr(stdout, dict[l].key, dict[l].key_len);
-      putchar('\n');
+      show_collision(stdout, h,
+                     validation_list[h]->key, validation_list[h]->key_len,
+                     dict[l].key, dict[l].key_len);
     }
-    list[h] = &dict[l];
+    validation_list[h] = &dict[l];
   }
   if (!fail) {
     puts("ok");
