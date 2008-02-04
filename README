@@ -40,7 +40,7 @@ It is just compilable.
   % mphash dictfile -o tst.c
   % gcc tst.c
 
-The compiled binary shows hash code, keys and values.
+The compiled binary shows a hash code, key and value for each line.
 mphash assigned 0 to 3 for the 4 keys.
 
   % ./a.out
@@ -49,7 +49,7 @@ mphash assigned 0 to 3 for the 4 keys.
   3 "baz" "C-style quoted string is usable in keys and values"
   0 "qux" "moge"
 
-The binary shows hash values for specified arguments.
+The binary shows hash codes and values for specified arguments.
 
   % ./a.out baz bar
   3 "C-style quoted string is usable in keys and values"
@@ -67,7 +67,8 @@ However a hash code in the range doesn't mean the string is a key.
 
 === Large Set
 
-mphash can be used for large key sets, /usr/share/dict/words for example.
+mphash can be used for fairly large key sets,
+/usr/share/dict/words for example.
 The 98568 words in the file are mapped to integers 0 to 98567.
 
   % wc -w /usr/share/dict/words
@@ -86,7 +87,7 @@ The 98568 words in the file are mapped to integers 0 to 98567.
   98566 "moralizes"
   98567 "verdigris's"
 
-Note that the given file is single-column, table value is not shown.
+Note that the given file is single-column, table values are not shown.
 
 === Quoted String
 
@@ -133,7 +134,7 @@ The keys and values can be quoted strings.
   567 "old lace" "\375\365\346"
   87 "OldLace" "\375\365\346"
 
-=== Module Options
+=== Options for Generating Libraries
 
   # self-contained test command
   #
