@@ -403,7 +403,7 @@ const void *mphash_table_lookup(const void *key, size_t length,
 /*---------------------------------------------------------------------*/
 /* minimal perfect hash function, by Tanaka Akira 2008, Public Domain. */
 
-#define RANK_BLOCKSIZE <%=MPHash::MPHF::RANK_BLOCKSIZE%>
+#define RANK_SUPERBLOCKSIZE <%=MPHash::MPHF::RANK_SUPERBLOCKSIZE%>
 #define RANK_SMALLBLOCKSIZE <%=MPHash::MPHF::RANK_SMALLBLOCKSIZE%>
 
 #define GCC_VERSION_BEFORE(major, minor, patchlevel) \
@@ -452,15 +452,15 @@ uint32_t mphash_generic(
   ph = h[i % 3];
   if (g[i % 3] == 3)
     return MPHASH_NON_KEY;
-  a = ph / RANK_BLOCKSIZE;
-  b = ph % RANK_BLOCKSIZE;
+  a = ph / RANK_SUPERBLOCKSIZE;
+  b = ph % RANK_SUPERBLOCKSIZE;
   c = b % RANK_SMALLBLOCKSIZE;
   b = b / RANK_SMALLBLOCKSIZE;
   mph = 0;
   if (a != 0)
     mph = param->rs[a-1];
   if (b != 0)
-    mph += param->rb[a*(RANK_BLOCKSIZE/RANK_SMALLBLOCKSIZE-1)+b-1];
+    mph += param->rb[a*(RANK_SUPERBLOCKSIZE/RANK_SMALLBLOCKSIZE-1)+b-1];
   if (c != 0) {
     i = ph / RANK_SMALLBLOCKSIZE;
     u0 = param->g[i*2];

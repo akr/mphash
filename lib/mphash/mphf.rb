@@ -153,7 +153,7 @@ class MPHash
       }
     end
 
-    RANK_BLOCKSIZE = 256
+    RANK_SUPERBLOCKSIZE = 256
     RANK_SMALLBLOCKSIZE = 32
     def ranking
       @rs = []
@@ -161,7 +161,7 @@ class MPHash
       k = 0
       @g.each_with_index {|j, i|
         if i != 0
-          if i % RANK_BLOCKSIZE == 0
+          if i % RANK_SUPERBLOCKSIZE == 0
             @rs << k
           elsif i % RANK_SMALLBLOCKSIZE == 0
             @rb << (k - @rs.fetch(-1, 0))
@@ -193,7 +193,7 @@ class MPHash
       if @g[h] == @r
         return NON_KEY, full_hs # no key
       end
-      a, b = h.divmod(RANK_BLOCKSIZE)
+      a, b = h.divmod(RANK_SUPERBLOCKSIZE)
       if a == 0
         result = 0
       else
@@ -201,7 +201,7 @@ class MPHash
       end
       b, c = b.divmod(RANK_SMALLBLOCKSIZE)
       if b != 0
-        result += @rb[a*(RANK_BLOCKSIZE/RANK_SMALLBLOCKSIZE-1)+b-1]
+        result += @rb[a*(RANK_SUPERBLOCKSIZE/RANK_SMALLBLOCKSIZE-1)+b-1]
       end
       (h-c).upto(h-1) {|i|
         result += 1 if @g[i] != @r
