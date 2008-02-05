@@ -27,9 +27,9 @@
 mphash.o: mphash.c hash/lookup3.c code/code_lookup3.c
 	$(CC) $(INCFLAGS) $(CPPFLAGS) $(CFLAGS) -c $<
 
-code/code_lookup3.c: hash/lookup3.c txt2c.rb
+code/code_lookup3.c: hash/lookup3.c tool/txt2c.rb
 	test -d code || mkdir code
-	$(RUBY) txt2c.rb -o $@ $<
+	$(RUBY) tool/txt2c.rb -o $@ $<
 
 rdoc/created.rid: README mphash.c lib/mphash/mphf.rb lib/mphash.rb
 	rm -rf rdoc
@@ -39,8 +39,8 @@ rdoc: rdoc/created.rid
 
 all: bin/mphash
 
-bin/mphash: bin/mphash.in
-	$(RUBY) fix-shebang.rb -o $@ $<
+bin/mphash: bin/mphash.in tool/fix-shebang.rb
+	$(RUBY) tool/fix-shebang.rb -o $@ $<
 
 install: install-bin install-man
 
