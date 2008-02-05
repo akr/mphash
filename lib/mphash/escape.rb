@@ -42,25 +42,30 @@ class MPHash
 
   0.upto(0xff) {|c|
     s = [c].pack("C")
-    oct = "%03o" % c
-    SRC_UNESCAPE[oct] = s
-    SRC_UNESCAPE[oct[1,2]] = s if /\A0/ =~ oct
-    SRC_UNESCAPE[oct[2,1]] = s if /\A00/ =~ oct
-    hex = "x%02x" % c
-    SRC_UNESCAPE[hex] = s
+    SRC_UNESCAPE["%03o" % c] = s
+    SRC_UNESCAPE["%02o" % c] = s
+    SRC_UNESCAPE["%01o" % c] = s
+    SRC_UNESCAPE["x%02x" % c] = s
+    SRC_UNESCAPE["x%01x" % c] = s
+    if 0x20 <= c && c <= 0x7e && /[0-9A-Za-z]/ !~ s
+      SRC_UNESCAPE[s] = s
+    end
   }
-  SRC_UNESCAPE['"'] = '"'
-  SRC_UNESCAPE['\\'] = '\\'
 
   sorted_keys = SRC_UNESCAPE.keys.sort_by {|k| -k.length }
-  QUOTED_STRING_PAT = /"((?:[^\\"]|\\#{Regexp.union(*sorted_keys)})*)"/o
-  QUOTED_STRING_CONTENT_PAT = /[^\\"]|\\(#{Regexp.union(*sorted_keys)})/o
+  QUOTED_STRING_PAT = /"((?:[^\\"]|\\(?:[tnrfbave -\/:-@\[-`\{-~]|x[0-9A-Fa-f][0-9A-Fa-f]?|[0-3][0-7][0-7]|[0-7][0-7]?))*)"/o
+  QUOTED_STRING_CONTENT_PAT = %r{[^\\"]|\\([tnrfbave -\/:-@\[-`\{-~]|x[0-9A-Fa-f][0-9A-Fa-f]?|[0-3][0-7][0-7]|[0-7][0-7]?)}o
   def MPHash.str_undump(str)
     if /\A#{QUOTED_STRING_PAT}\z/o !~ str
       raise ArgumentError, "invalid quoting: #{str.inspect}"
     end
-    key = $1.gsub(QUOTED_STRING_CONTENT_PAT) {
-      $1 ? SRC_UNESCAPE[$1] : $&
+    content = $1
+    key = content.gsub(QUOTED_STRING_CONTENT_PAT) {
+      if $1
+        SRC_UNESCAPE.fetch($1) { raise ArgumentError, "unexpected escape sequence : #{$1.inspect}" }
+      else
+        $&
+      end
     }
   end
 
