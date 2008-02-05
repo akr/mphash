@@ -213,6 +213,10 @@ Daisuke Okanohara
 "Bep: Associative Arrays for Very Large Collections"
 http://www-tsujii.is.s.u-tokyo.ac.jp/~hillbig/bep.htm
 
+Bob Jenkins
+"LOOKUP3.C, for hash table lookup"
+http://burtleburtle.net/bob/c/lookup3.c
+
 == License
 
 === mphash itself
