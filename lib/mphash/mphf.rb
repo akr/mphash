@@ -64,7 +64,6 @@ class MPHash
   class MPHF
     # generate a minimal perfect hash function from an array of strings.
     def initialize(keys)
-      keys = keys.dup
       check_keys keys
       @r = 3
       @n = keys.length
