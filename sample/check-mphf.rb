@@ -1,4 +1,4 @@
-# extconf.rb - mphash extension build script
+# check-mphf.rb - mphash test program
 #
 # Copyright (C) 2008 Tanaka Akira  <akr@fsij.org>
 # 
@@ -39,7 +39,7 @@ mphf = MPHash::MPHF.new(keys)
 
 check = {}
 keys.each {|key|
-  hash = mphf.mphf(key)
+  hash = mphf.hashcode(key)
   p [key, hash]
   if check[hash]
     raise "collision: #{hash} : #{check[hash].inspect} #{key.inspect}"
