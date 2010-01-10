@@ -183,9 +183,7 @@ The keys and values can be quoted strings.
 
 * latest release: none
 
-* development version in Subversion repository:
-
-    % svn co svn://svn@svn.a-k-r.org/akr/mphash/trunk mphash
+* development version: http://github.com/akr/mphash
 
 == Install
 
