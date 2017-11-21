@@ -25,7 +25,11 @@
 # OF SUCH DAMAGE.
 
 require 'mphash/missing'
-require 'mphash.so'
+begin
+  require 'mphash.so'
+rescue LoadError
+  require 'mphash.bundle'
+end
 require 'mphash/mphf'
 require 'mphash/escape'
 
