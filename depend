@@ -57,4 +57,4 @@ clean-bin:
 
 .PHONY: test
 test:
-	$(RUBY) -Ilib test-all.rb
+	$(RUBY) -Ilib -I. test-all.rb
